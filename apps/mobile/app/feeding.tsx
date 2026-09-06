@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Pressable,
+  RefreshControl,
   ScrollView,
   Text,
   TextInput,
@@ -38,6 +39,7 @@ export default function Feeding() {
   const [times, setTimes] = useState("07:00, 11:00, 15:00, 19:00");
   const [adjustment, setAdjustment] = useState(0);
   const [weightHistory, setWeightHistory] = useState<WeightRecord[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
   useFocusEffect(
     useCallback(() => {
       void dogService.list().then((rows) => {
@@ -47,6 +49,7 @@ export default function Feeding() {
     }, []),
   );
   const dog = dogs.find((item) => item.id === dogId);
+  const refresh=async()=>{setRefreshing(true);try{const rows=await dogService.list();setDogs(rows);if(dogId)setWeightHistory(await dogService.weights(dogId))}finally{setRefreshing(false)}};
   useEffect(() => { if (!dogId) return; void Promise.all([feedingService.find(dogId),dogService.weights(dogId)]).then(([saved,history]) => { setWeightHistory(history); if (!saved) { setAdjustment(0); return; } setFoodName(saved.foodName); setKcal(String(saved.kcalPerKg)); setStage(saved.lifeStage); setGoal(saved.goal); setMeals(String(saved.mealsPerDay)); setTimes(saved.times.join(", ")); setAdjustment(saved.adjustmentPercent); }); }, [dogId]);
   const plan = useMemo(() => {
     try {
@@ -111,7 +114,7 @@ export default function Feeding() {
     }
   }
   return (
-    <SafeAreaView style={common.screen} edges={["top","left","right"]}><ScrollView contentContainerStyle={common.content} keyboardShouldPersistTaps="handled">
+    <SafeAreaView style={common.screen} edges={["top","left","right"]}><ScrollView contentContainerStyle={common.content} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>void refresh()} tintColor={colors.blue} colors={[colors.blue]}/> }>
       <Text style={common.eyebrow}>NUTRIÇÃO</Text>
       <Text style={common.title}>Alimentação</Text>
       <Text style={common.subtitle}>

@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { Alert, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { Alert, Modal, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -12,8 +12,9 @@ type DogForm={name:string;registeredName:string;breed:string;birthDate:string;we
 const empty:DogForm={name:'',registeredName:'',breed:'American Bully Standard',birthDate:'',weight:'',color:'',notes:'',status:'puppy',sex:'male'}
 
 export default function Dogs(){
-  const [dogs,setDogs]=useState<MobileDog[]>([]),[query,setQuery]=useState(''),[selected,setSelected]=useState<MobileDog|null>(null),[mode,setMode]=useState<Mode>(null),[form,setForm]=useState<DogForm>(empty),[weights,setWeights]=useState<WeightRecord[]>([]),[weight,setWeight]=useState(''),[bcs,setBcs]=useState(''),[editingWeight,setEditingWeight]=useState<string|null>(null)
+  const [dogs,setDogs]=useState<MobileDog[]>([]),[query,setQuery]=useState(''),[selected,setSelected]=useState<MobileDog|null>(null),[mode,setMode]=useState<Mode>(null),[form,setForm]=useState<DogForm>(empty),[weights,setWeights]=useState<WeightRecord[]>([]),[weight,setWeight]=useState(''),[bcs,setBcs]=useState(''),[editingWeight,setEditingWeight]=useState<string|null>(null),[refreshing,setRefreshing]=useState(false)
   const load=useCallback(()=>{void dogService.list().then(setDogs)},[]);useFocusEffect(load)
+  const refresh=async()=>{setRefreshing(true);try{setDogs(await dogService.list())}finally{setRefreshing(false)}}
   const visible=dogs.filter(d=>`${d.name} ${d.registeredName} ${d.breed}`.toLowerCase().includes(query.toLowerCase()))
   const close=()=>{setMode(null);setEditingWeight(null);setWeight('');setBcs('')}
   const openForm=(dog?:MobileDog)=>{setSelected(dog??null);setForm(dog?{name:dog.name,registeredName:dog.registeredName,breed:dog.breed,birthDate:dog.birthDate,weight:String(dog.weightKg).replace('.',','),color:dog.color,notes:dog.notes,status:dog.status,sex:dog.sex}:empty);setMode('form')}
@@ -21,7 +22,7 @@ export default function Dogs(){
   async function saveDog(){try{if(!form.name.trim()||!form.birthDate)throw new Error('Informe nome e nascimento.');const data={name:form.name,birthDate:form.birthDate,breed:form.breed,sex:form.sex,registeredName:form.registeredName,color:form.color,status:form.status,notes:form.notes};if(selected)await dogService.update(selected.id,data);else{const kg=Number(form.weight.replace(',','.'));if(!kg||kg<=0)throw new Error('Informe o peso inicial.');await dogService.create({...data,weightKg:kg})}close();load()}catch(e){Alert.alert('Não foi possível salvar',e instanceof Error?e.message:'Confira os dados.')}}
   async function saveWeight(){try{if(!selected)return;const kg=Number(weight.replace(',','.')),score=bcs?Number(bcs):null;if(!kg||kg<=0||score!==null&&(score<1||score>9))throw new Error('Informe peso válido e BCS entre 1 e 9.');if(editingWeight)await dogService.updateWeight(editingWeight,kg,score);else await dogService.addWeight(selected.id,kg,score);setWeight('');setBcs('');setEditingWeight(null);setWeights(await dogService.weights(selected.id));load()}catch(e){Alert.alert('Não foi possível registrar',e instanceof Error?e.message:'Confira os dados.')}}
   const field=(label:string,key:keyof typeof form,placeholder='')=><><Text style={common.label}>{label}</Text><TextInput style={common.input} value={form[key]} onChangeText={v=>setForm({...form,[key]:v})} placeholder={placeholder} placeholderTextColor={colors.muted}/></>
-  return <SafeAreaView style={common.screen} edges={['top','left','right']}><ScrollView contentContainerStyle={common.content} keyboardShouldPersistTaps="handled">
+  return <SafeAreaView style={common.screen} edges={['top','left','right']}><ScrollView contentContainerStyle={common.content} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>void refresh()} tintColor={colors.blue} colors={[colors.blue]}/> }>
     <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}><View><Text style={common.eyebrow}>PLANTEL</Text><Text style={common.title}>Cães</Text></View><Pressable style={common.iconButton} onPress={()=>openForm()}><Ionicons name="add" size={24} color={colors.blue}/></Pressable></View>
     <Text style={common.subtitle}>Toque em um animal para abrir a ficha completa.</Text>
     <View style={{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:'#07101a',borderWidth:1,borderColor:colors.line,borderRadius:14,paddingHorizontal:13,marginBottom:16}}><Ionicons name="search" size={19} color={colors.muted}/><TextInput style={{flex:1,color:colors.text,paddingVertical:14}} value={query} onChangeText={setQuery} placeholder="Buscar por nome ou raça" placeholderTextColor={colors.muted}/></View>

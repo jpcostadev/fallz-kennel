@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { Image, Pressable, ScrollView, Text, View } from 'react-native'
+import { Image, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -8,10 +8,12 @@ import { colors, common } from '../src/theme'
 import logo from '../../../fallz-kennel.png'
 
 export default function Home() {
-  const router=useRouter(), [dogs,setDogs]=useState<MobileDog[]>([]), [reminders,setReminders]=useState<Reminder[]>([])
-  useFocusEffect(useCallback(()=>{ void Promise.all([dogService.list(),reminderService.list()]).then(([d,r])=>{setDogs(d);setReminders(r.filter(x=>new Date(x.dateTime)>new Date()))}) },[]))
+  const router=useRouter(), [dogs,setDogs]=useState<MobileDog[]>([]), [reminders,setReminders]=useState<Reminder[]>([]), [refreshing,setRefreshing]=useState(false)
+  const load=useCallback(async()=>{const [d,r]=await Promise.all([dogService.list(),reminderService.list()]);setDogs(d);setReminders(r.filter(x=>new Date(x.dateTime)>new Date()))},[])
+  useFocusEffect(useCallback(()=>{void load()},[load]))
+  const refresh=async()=>{setRefreshing(true);try{await load()}finally{setRefreshing(false)}}
   const next=reminders[0]
-  return <SafeAreaView style={common.screen} edges={['top','left','right']}><ScrollView contentContainerStyle={common.content}>
+  return <SafeAreaView style={common.screen} edges={['top','left','right']}><ScrollView contentContainerStyle={common.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>void refresh()} tintColor={colors.blue} colors={[colors.blue]}/>}>
     <View style={{flexDirection:'row',alignItems:'center',gap:13,marginBottom:20}}><Image source={logo} style={{width:58,height:58,borderRadius:17}} resizeMode="contain"/><View style={{flex:1}}><Text style={common.eyebrow}>CENTRAL DO CANIL</Text><Text style={[common.title,{fontSize:25}]}>Fallz Kennel</Text></View><Pressable style={common.iconButton} onPress={()=>router.push('/agenda')}><Ionicons name="notifications-outline" size={21} color={colors.text}/>{reminders.length>0&&<View style={{position:'absolute',right:8,top:8,width:7,height:7,borderRadius:4,backgroundColor:colors.red}}/>}</Pressable></View>
     <Text style={common.subtitle}>Plantel, alimentação e cuidados em um só lugar.</Text>
     <View style={[common.row,{flexWrap:'nowrap'}]}>

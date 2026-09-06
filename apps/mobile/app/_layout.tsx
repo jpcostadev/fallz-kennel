@@ -11,11 +11,11 @@ const tabIcon = (name: IconName) => ({ color, size }: { color: unknown; size: nu
 export default function Layout() {
   const [menu, setMenu] = useState(false)
   const router = useRouter()
-  const go = (path: '/dogs' | '/feeding' | '/agenda' | '/more') => { setMenu(false); router.push(path) }
+  const go = (path: '/dogs' | '/feeding' | '/agenda' | '/more' | '/settings') => { setMenu(false); router.push(path) }
   const actions: Array<[IconName,string,()=>void]> = [
     ['paw','Cadastrar ou abrir cães',()=>go('/dogs')], ['trending-up','Registrar pesagem',()=>go('/dogs')],
     ['restaurant','Plano de alimentação',()=>go('/feeding')], ['notifications','Criar lembrete',()=>go('/agenda')],
-    ['cloud-done','Sincronização Firebase',()=>go('/more')]
+    ['cloud-done','Sincronização Firebase',()=>go('/more')], ['settings','Configurações',()=>go('/settings')]
   ]
   return <>
     <StatusBar style="light" />
@@ -25,6 +25,7 @@ export default function Layout() {
       <Tabs.Screen name="feeding" options={{ title:'Alimentação',tabBarIcon:tabIcon('restaurant-outline') }}/>
       <Tabs.Screen name="agenda" options={{ title:'Agenda',tabBarIcon:tabIcon('calendar-outline') }}/>
       <Tabs.Screen name="more" options={{ title:'Mais',tabBarIcon:tabIcon('add-circle-outline'),tabBarButton:()=><Pressable onPress={()=>setMenu(true)} style={{flex:1,alignItems:'center',justifyContent:'center'}}><Ionicons name="add-circle-outline" size={27} color={colors.muted}/><Text style={{color:colors.muted,fontSize:10,fontWeight:'700'}}>Mais</Text></Pressable> }}/>
+      <Tabs.Screen name="settings" options={{ href:null }}/>
     </Tabs>
     <Modal visible={menu} transparent animationType="slide" onRequestClose={()=>setMenu(false)}>
       <Pressable style={{flex:1,backgroundColor:'rgba(0,0,0,.7)',justifyContent:'flex-end'}} onPress={()=>setMenu(false)}>

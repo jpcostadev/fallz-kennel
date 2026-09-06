@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   Alert,
   Pressable,
+  RefreshControl,
   ScrollView,
   Text,
   TextInput,
@@ -22,6 +23,7 @@ export default function More() {
     [busy, setBusy] = useState(false),
     [status, setStatus] = useState(""),
     [pending, setPending] = useState(0);
+  const [refreshing,setRefreshing]=useState(false);
   useEffect(() => {
     void syncService.summary().then((s) => setPending(s.pending));
     return observeUser(setUser);
@@ -60,8 +62,9 @@ export default function More() {
     try { setBusy(true); const update=await Updates.checkForUpdateAsync(); if(!update.isAvailable){Alert.alert("Tudo atualizado","Você já está na versão mais recente.");return} await Updates.fetchUpdateAsync(); Alert.alert("Atualização pronta","Reiniciar agora para aplicar?",[{text:"Depois"},{text:"Reiniciar",onPress:()=>void Updates.reloadAsync()}]); }
     catch(e){Alert.alert("Falha na atualização",e instanceof Error?e.message:"Tente novamente.")} finally{setBusy(false)}
   }
+  async function refresh(){setRefreshing(true);try{setPending((await syncService.summary()).pending)}finally{setRefreshing(false)}}
   return (
-    <SafeAreaView style={common.screen} edges={["top","left","right"]}><ScrollView contentContainerStyle={common.content} keyboardShouldPersistTaps="handled">
+    <SafeAreaView style={common.screen} edges={["top","left","right"]}><ScrollView contentContainerStyle={common.content} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>void refresh()} tintColor={colors.blue} colors={[colors.blue]}/> }>
       <Text style={common.eyebrow}>FIREBASE</Text>
       <Text style={common.title}>Sincronização</Text>
       <Text style={common.subtitle}>

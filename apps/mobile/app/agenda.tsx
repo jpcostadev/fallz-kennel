@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import {
   Alert,
   Pressable,
+  RefreshControl,
   ScrollView,
   Text,
   TextInput,
@@ -26,6 +27,7 @@ export default function Agenda() {
   const [title, setTitle] = useState("Consulta veterinária");
   const [dateTime, setDateTime] = useState("");
   const [editing, setEditing] = useState<Reminder | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const load = useCallback(() => {
     void Promise.all([dogService.list(), reminderService.list()]).then(
       ([d, r]) => {
@@ -35,6 +37,7 @@ export default function Agenda() {
     );
   }, []);
   useFocusEffect(load);
+  const refresh=async()=>{setRefreshing(true);try{const [d,r]=await Promise.all([dogService.list(),reminderService.list()]);setDogs(d);setItems(r)}finally{setRefreshing(false)}};
   async function save() {
     try {
       const date = new Date(dateTime);
@@ -66,7 +69,7 @@ export default function Agenda() {
     }
   }
   return (
-    <SafeAreaView style={common.screen} edges={["top","left","right"]}><ScrollView contentContainerStyle={common.content} keyboardShouldPersistTaps="handled">
+    <SafeAreaView style={common.screen} edges={["top","left","right"]}><ScrollView contentContainerStyle={common.content} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>void refresh()} tintColor={colors.blue} colors={[colors.blue]}/> }>
       <Text style={common.eyebrow}>CUIDADOS</Text>
       <Text style={common.title}>Agenda</Text>
       <Text style={common.subtitle}>
