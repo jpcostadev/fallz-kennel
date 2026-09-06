@@ -64,6 +64,7 @@
       "out/**/*",
       "package.json"
     ],
+    "publish": [{ "provider": "github", "owner": "jpcostadev", "repo": "fallz-kennel" }],
     "asarUnpack": [
       "**/node_modules/better-sqlite3/**/*"
     ],
@@ -72,8 +73,7 @@
       "artifactName": "Fallz-Kennel-Setup-${version}.${ext}",
       "target": [
         "nsis"
-      ],
-      "publish": [{ "provider": "github", "owner": "jpcostadev", "repo": "fallz-kennel" }]
+      ]
     },
     "nsis": {
       "oneClick": false,
