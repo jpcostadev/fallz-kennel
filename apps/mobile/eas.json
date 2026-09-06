@@ -1,7 +1,19 @@
 {
   "cli": { "version": ">= 16.0.0", "appVersionSource": "local" },
   "build": {
-    "preview": { "distribution": "internal", "android": { "buildType": "apk" } },
-    "production": { "android": { "buildType": "app-bundle" } }
+    "preview": {
+      "channel": "preview",
+      "distribution": "internal",
+      "android": { "buildType": "apk" },
+      "env": {
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyCUMaHeral-cOkd6okn8YeMdVJNBdv-lr4",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "fallzkannel.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "fallzkannel",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "fallzkannel.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "516615052850",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:516615052850:web:fd2e7a1cb032b9d889262b"
+      }
+    },
+    "production": { "channel": "production", "android": { "buildType": "app-bundle" } }
   }
 }

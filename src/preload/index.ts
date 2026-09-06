@@ -3,6 +3,7 @@ import type { CreateDogInput, FallzApi } from '../shared/dog'
 import type { KennelSettings, ModuleRecordInput, OperationalModule } from '../shared/module'
 import type { MeasurementInput } from '../shared/measurement'
 import type { SyncEvent } from '../shared/sync'
+import type { FeedingPlanInput } from '../shared/feeding'
 
 const api: FallzApi = {
   dogs: {
@@ -29,6 +30,11 @@ const api: FallzApi = {
     update: (id: string, input: MeasurementInput) => ipcRenderer.invoke('measurements:update', id, input),
     remove: (id: string) => ipcRenderer.invoke('measurements:remove', id)
   },
+  feeding: {
+    list: () => ipcRenderer.invoke('feeding:list'),
+    save: (input:FeedingPlanInput) => ipcRenderer.invoke('feeding:save',input),
+    remove: (id:string) => ipcRenderer.invoke('feeding:remove',id)
+  },
   sync: {
     summary: () => ipcRenderer.invoke('sync:summary'),
     pending: () => ipcRenderer.invoke('sync:pending'),
@@ -38,6 +44,10 @@ const api: FallzApi = {
   reports: {
     dog: (dogId: string) => ipcRenderer.invoke('reports:dog', dogId),
     exportPdf: (title: string) => ipcRenderer.invoke('reports:export-pdf', title)
+  },
+  updater: {
+    check: () => ipcRenderer.invoke('updater:check'),
+    install: () => ipcRenderer.invoke('updater:install')
   }
 }
 

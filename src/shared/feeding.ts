@@ -15,3 +15,7 @@ export const feedingPlanRecordSchema = z.object({
   createdAt: z.string(), updatedAt: z.string(), deletedAt: z.string().nullable(), version: z.number().int().positive(), deviceId: z.string().uuid()
 })
 export type FeedingPlanRecord = z.infer<typeof feedingPlanRecordSchema>
+
+export const feedingPlanInputSchema = feedingPlanRecordSchema.pick({ dogId:true,foodName:true,kcalPerKg:true,dailyGrams:true,gramsPerMeal:true,mealsPerDay:true,times:true,lifeStage:true,goal:true,adjustmentPercent:true })
+export type FeedingPlanInput = z.infer<typeof feedingPlanInputSchema>
+export interface FeedingApi { feeding:{ list():Promise<FeedingPlanRecord[]>; save(input:FeedingPlanInput):Promise<FeedingPlanRecord>; remove(id:string):Promise<void> } }

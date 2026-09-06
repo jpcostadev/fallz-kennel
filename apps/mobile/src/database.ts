@@ -9,6 +9,10 @@ export interface MobileDog {
   weightKg: number;
   breed: string;
   sex: "male" | "female";
+  registeredName: string;
+  color: string;
+  status: string;
+  notes: string;
   updatedAt: string;
   version: number;
   deviceId: string;
@@ -125,6 +129,10 @@ export const dogService = {
       birthDate: string;
       breed: string;
       sex: "male" | "female";
+      registeredName?: string;
+      color?: string;
+      status?: string;
+      notes?: string;
     },
   ) {
     const db = await getDatabase(),
@@ -143,10 +151,10 @@ export const dogService = {
       ...input,
       id,
       weightKg: row.weight_kg,
-      registeredName: "",
-      color: "",
-      status: "puppy",
-      notes: "",
+      registeredName: input.registeredName ?? "",
+      color: input.color ?? "",
+      status: input.status ?? "puppy",
+      notes: input.notes ?? "",
       createdAt: row.created_at,
       updatedAt: now,
       deletedAt: null,
@@ -155,11 +163,15 @@ export const dogService = {
     };
     await db.withTransactionAsync(async () => {
       await db.runAsync(
-        "UPDATE dogs SET name=?,birth_date=?,breed=?,sex=?,updated_at=?,version=? WHERE id=?",
+        "UPDATE dogs SET name=?,birth_date=?,breed=?,sex=?,registered_name=?,color=?,status=?,notes=?,updated_at=?,version=? WHERE id=?",
         input.name.trim(),
         input.birthDate,
         input.breed.trim(),
         input.sex,
+        dog.registeredName,
+        dog.color,
+        dog.status,
+        dog.notes,
         now,
         dog.version,
         id,
@@ -316,6 +328,10 @@ export const dogService = {
       updated_at: string;
       version: number;
       device_id: string;
+      registered_name: string;
+      color: string;
+      status: string;
+      notes: string;
     }>("SELECT * FROM dogs WHERE deleted_at IS NULL ORDER BY name");
     return rows.map((r) => ({
       id: r.id,
@@ -327,6 +343,10 @@ export const dogService = {
       updatedAt: r.updated_at,
       version: r.version,
       deviceId: r.device_id,
+      registeredName: r.registered_name,
+      color: r.color,
+      status: r.status,
+      notes: r.notes,
     }));
   },
   async create(
@@ -343,10 +363,10 @@ export const dogService = {
         deletedAt: null,
         version: 1,
         deviceId,
-        registeredName: "",
-        color: "",
-        status: "puppy",
-        notes: "",
+        registeredName: input.registeredName ?? "",
+        color: input.color ?? "",
+        status: input.status ?? "puppy",
+        notes: input.notes ?? "",
       },
       measurement = {
         id: uuid(),

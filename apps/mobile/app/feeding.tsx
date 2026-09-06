@@ -8,6 +8,8 @@ import {
   View,
 } from "react-native";
 import { useFocusEffect } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import {
   calculateFeedingPlan,
   suggestFeedingAdjustment,
@@ -109,7 +111,7 @@ export default function Feeding() {
     }
   }
   return (
-    <ScrollView style={common.screen} keyboardShouldPersistTaps="handled">
+    <SafeAreaView style={common.screen} edges={["top","left","right"]}><ScrollView contentContainerStyle={common.content} keyboardShouldPersistTaps="handled">
       <Text style={common.eyebrow}>NUTRIÇÃO</Text>
       <Text style={common.title}>Alimentação</Text>
       <Text style={common.subtitle}>
@@ -248,8 +250,8 @@ export default function Feeding() {
         style={[common.button, { marginBottom: 40 }]}
         onPress={() => void save()}
       >
-        <Text style={common.buttonText}>Salvar e criar lembretes</Text>
+        <Ionicons name="save-outline" size={19} color="white" /><Text style={common.buttonText}>Salvar e criar lembretes</Text>
       </Pressable>
-    </ScrollView>
+    </ScrollView></SafeAreaView>
   );
 }

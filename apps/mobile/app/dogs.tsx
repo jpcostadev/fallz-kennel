@@ -1,289 +1,38 @@
-import { useCallback, useState } from "react";
-import {
-  Alert,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import { useFocusEffect } from "expo-router";
-import { dogService, type MobileDog, type WeightRecord } from "../src/database";
-import { colors, common } from "../src/theme";
+import { useCallback, useState } from 'react'
+import { Alert, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { useFocusEffect } from 'expo-router'
+import { Ionicons } from '@expo/vector-icons'
+import { dogService, type MobileDog, type WeightRecord } from '../src/database'
+import { colors, common } from '../src/theme'
 
-export default function Dogs() {
-  const [dogs, setDogs] = useState<MobileDog[]>([]),
-    [name, setName] = useState(""),
-    [breed, setBreed] = useState("American Bully Standard"),
-    [birthDate, setBirthDate] = useState(""),
-    [weight, setWeight] = useState(""),
-    [sex, setSex] = useState<"male" | "female">("male"),
-    [editing, setEditing] = useState<string | null>(null),
-    [editingWeight, setEditingWeight] = useState<string | null>(null),
-    [tracking, setTracking] = useState<MobileDog | null>(null),
-    [weights, setWeights] = useState<WeightRecord[]>([]),
-    [bcs, setBcs] = useState("");
-  const load = useCallback(() => {
-    void dogService.list().then(setDogs);
-  }, []);
-  useFocusEffect(load);
-  function clear() {
-    setName("");
-    setBirthDate("");
-    setWeight("");
-    setSex("male");
-    setEditing(null);
-  }
-  function edit(d: MobileDog) {
-    setEditing(d.id);
-    setName(d.name);
-    setBreed(d.breed);
-    setBirthDate(d.birthDate);
-    setSex(d.sex);
-    setTracking(null);
-  }
-  async function save() {
-    try {
-      if (!name.trim() || !birthDate)
-        throw new Error("Preencha nome e nascimento.");
-      if (editing)
-        await dogService.update(editing, { name, birthDate, breed, sex });
-      else {
-        const weightKg = Number(weight.replace(",", "."));
-        if (!Number.isFinite(weightKg) || weightKg <= 0)
-          throw new Error("Informe o peso inicial.");
-        await dogService.create({ name, birthDate, weightKg, breed, sex });
-      }
-      clear();
-      load();
-    } catch (e) {
-      Alert.alert(
-        "Não foi possível salvar",
-        e instanceof Error ? e.message : "Confira os dados.",
-      );
-    }
-  }
-  async function openTracking(d: MobileDog) {
-    setTracking(d);
-    setEditing(null);
-    setWeight("");
-    setBcs("");
-    setEditingWeight(null);
-    setWeights(await dogService.weights(d.id));
-  }
-  async function addWeight() {
-    try {
-      if (!tracking) return;
-      const kg = Number(weight.replace(",", ".")),
-        score = bcs ? Number(bcs) : null;
-      if (
-        !Number.isFinite(kg) ||
-        kg <= 0 ||
-        (score !== null && (score < 1 || score > 9))
-      )
-        throw new Error("Informe peso e BCS entre 1 e 9.");
-      if (editingWeight) await dogService.updateWeight(editingWeight, kg, score);
-      else await dogService.addWeight(tracking.id, kg, score);
-      setWeight("");
-      setBcs("");
-      setEditingWeight(null);
-      await openTracking({ ...tracking, weightKg: kg });
-      load();
-    } catch (e) {
-      Alert.alert(
-        "Não foi possível registrar",
-        e instanceof Error ? e.message : "Confira os dados.",
-      );
-    }
-  }
-  function removeDog(d: MobileDog) {
-    Alert.alert("Excluir cão", `Excluir ${d.name}?`, [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Excluir",
-        style: "destructive",
-        onPress: () => void dogService.remove(d.id).then(load),
-      },
-    ]);
-  }
-  return (
-    <ScrollView style={common.screen} keyboardShouldPersistTaps="handled">
-      <Text style={common.eyebrow}>PLANTEL</Text>
-      <Text style={common.title}>
-        {editing
-          ? "Editar cão"
-          : tracking
-            ? `Acompanhamento — ${tracking.name}`
-            : "Cães"}
-      </Text>
-      <Text style={common.subtitle}>
-        Cadastro completo, edição e evolução do peso.
-      </Text>
-      {tracking ? (
-        <>
-          <View style={common.card}>
-            <Text style={common.label}>NOVO PESO (KG)</Text>
-            <TextInput
-              style={common.input}
-              value={weight}
-              onChangeText={setWeight}
-              keyboardType="decimal-pad"
-              placeholder="4,6"
-              placeholderTextColor={colors.muted}
-            />
-            <Text style={common.label}>ESCORE CORPORAL BCS (1–9)</Text>
-            <TextInput
-              style={common.input}
-              value={bcs}
-              onChangeText={setBcs}
-              keyboardType="number-pad"
-              placeholder="4 ou 5 é a faixa ideal"
-              placeholderTextColor={colors.muted}
-            />
-            <Pressable style={common.button} onPress={() => void addWeight()}>
-              <Text style={common.buttonText}>{editingWeight ? "Salvar pesagem" : "Registrar pesagem"}</Text>
-            </Pressable>
-            <Pressable
-              style={{ padding: 14, alignItems: "center" }}
-              onPress={() => setTracking(null)}
-            >
-              <Text style={common.muted}>Voltar</Text>
-            </Pressable>
-          </View>
-          {weights.map((w) => (
-            <View key={w.id} style={common.card}>
-              <Text style={common.value}>
-                {(w.weightGrams / 1000).toLocaleString("pt-BR")} kg
-              </Text>
-              <Text style={common.muted}>
-                {new Date(`${w.date}T12:00`).toLocaleDateString("pt-BR")} · BCS{" "}
-                {w.bodyConditionScore ?? "não informado"}
-              </Text>
-              <View style={[common.row, { marginTop: 10 }]}>
-                <Pressable
-                  onPress={() => {
-                    setWeight(String(w.weightGrams / 1000).replace(".", ","));
-                    setBcs(String(w.bodyConditionScore ?? ""));
-                    setEditingWeight(w.id);
-                  }}
-                >
-                  <Text style={{ color: colors.blue }}>Editar</Text>
-                </Pressable>
-                <Pressable
-                  onPress={() =>
-                    Alert.alert("Excluir pesagem", "Confirma a exclusão?", [
-                      { text: "Cancelar" },
-                      {
-                        text: "Excluir",
-                        style: "destructive",
-                        onPress: () =>
-                          void dogService
-                            .removeWeight(w.id)
-                            .then(() => openTracking(tracking)),
-                      },
-                    ])
-                  }
-                >
-                  <Text style={{ color: colors.red }}>Excluir</Text>
-                </Pressable>
-              </View>
-            </View>
-          ))}
-        </>
-      ) : (
-        <>
-          <View style={common.card}>
-            <Text style={common.label}>NOME</Text>
-            <TextInput
-              style={common.input}
-              value={name}
-              onChangeText={setName}
-              placeholder="Nome do cão"
-              placeholderTextColor={colors.muted}
-            />
-            <Text style={common.label}>RAÇA</Text>
-            <TextInput
-              style={common.input}
-              value={breed}
-              onChangeText={setBreed}
-            />
-            <Text style={common.label}>NASCIMENTO (AAAA-MM-DD)</Text>
-            <TextInput
-              style={common.input}
-              value={birthDate}
-              onChangeText={setBirthDate}
-              placeholder="2026-07-04"
-              placeholderTextColor={colors.muted}
-            />
-            {!editing && (
-              <>
-                <Text style={common.label}>PESO INICIAL (KG)</Text>
-                <TextInput
-                  style={common.input}
-                  value={weight}
-                  onChangeText={setWeight}
-                  keyboardType="decimal-pad"
-                  placeholder="4,6"
-                  placeholderTextColor={colors.muted}
-                />
-              </>
-            )}
-            <View style={[common.row, { marginBottom: 12 }]}>
-              {(["male", "female"] as const).map((v) => (
-                <Pressable
-                  key={v}
-                  onPress={() => setSex(v)}
-                  style={[
-                    common.card,
-                    { flex: 1, marginBottom: 0 },
-                    sex === v && common.selected,
-                  ]}
-                >
-                  <Text style={{ color: colors.text, textAlign: "center" }}>
-                    {v === "male" ? "Macho" : "Fêmea"}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-            <Pressable style={common.button} onPress={() => void save()}>
-              <Text style={common.buttonText}>
-                {editing ? "Salvar alterações" : "Cadastrar cão"}
-              </Text>
-            </Pressable>
-            {editing && (
-              <Pressable
-                style={{ padding: 14, alignItems: "center" }}
-                onPress={clear}
-              >
-                <Text style={common.muted}>Cancelar edição</Text>
-              </Pressable>
-            )}
-          </View>
-          {dogs.map((d) => (
-            <View key={d.id} style={common.card}>
-              <Text
-                style={{ color: colors.text, fontSize: 18, fontWeight: "800" }}
-              >
-                {d.name}
-              </Text>
-              <Text style={common.muted}>
-                {d.breed} · {d.weightKg.toLocaleString("pt-BR")} kg
-              </Text>
-              <View style={[common.row, { marginTop: 12 }]}>
-                <Pressable onPress={() => edit(d)}>
-                  <Text style={{ color: colors.blue }}>Editar cão</Text>
-                </Pressable>
-                <Pressable onPress={() => void openTracking(d)}>
-                  <Text style={{ color: colors.green }}>Acompanhamento</Text>
-                </Pressable>
-                <Pressable onPress={() => removeDog(d)}>
-                  <Text style={{ color: colors.red }}>Excluir</Text>
-                </Pressable>
-              </View>
-            </View>
-          ))}
-        </>
-      )}
-    </ScrollView>
-  );
+type Mode='profile'|'form'|'tracking'|null
+const age=(date:string)=>{const months=Math.max(0,Math.floor((Date.now()-Date.parse(`${date}T12:00`))/2629800000));return months<12?`${months} meses`:`${Math.floor(months/12)} ano(s)`}
+type DogForm={name:string;registeredName:string;breed:string;birthDate:string;weight:string;color:string;notes:string;status:string;sex:'male'|'female'}
+const empty:DogForm={name:'',registeredName:'',breed:'American Bully Standard',birthDate:'',weight:'',color:'',notes:'',status:'puppy',sex:'male'}
+
+export default function Dogs(){
+  const [dogs,setDogs]=useState<MobileDog[]>([]),[query,setQuery]=useState(''),[selected,setSelected]=useState<MobileDog|null>(null),[mode,setMode]=useState<Mode>(null),[form,setForm]=useState<DogForm>(empty),[weights,setWeights]=useState<WeightRecord[]>([]),[weight,setWeight]=useState(''),[bcs,setBcs]=useState(''),[editingWeight,setEditingWeight]=useState<string|null>(null)
+  const load=useCallback(()=>{void dogService.list().then(setDogs)},[]);useFocusEffect(load)
+  const visible=dogs.filter(d=>`${d.name} ${d.registeredName} ${d.breed}`.toLowerCase().includes(query.toLowerCase()))
+  const close=()=>{setMode(null);setEditingWeight(null);setWeight('');setBcs('')}
+  const openForm=(dog?:MobileDog)=>{setSelected(dog??null);setForm(dog?{name:dog.name,registeredName:dog.registeredName,breed:dog.breed,birthDate:dog.birthDate,weight:String(dog.weightKg).replace('.',','),color:dog.color,notes:dog.notes,status:dog.status,sex:dog.sex}:empty);setMode('form')}
+  const openTracking=async(d:MobileDog)=>{setSelected(d);setWeights(await dogService.weights(d.id));setMode('tracking')}
+  async function saveDog(){try{if(!form.name.trim()||!form.birthDate)throw new Error('Informe nome e nascimento.');const data={name:form.name,birthDate:form.birthDate,breed:form.breed,sex:form.sex,registeredName:form.registeredName,color:form.color,status:form.status,notes:form.notes};if(selected)await dogService.update(selected.id,data);else{const kg=Number(form.weight.replace(',','.'));if(!kg||kg<=0)throw new Error('Informe o peso inicial.');await dogService.create({...data,weightKg:kg})}close();load()}catch(e){Alert.alert('Não foi possível salvar',e instanceof Error?e.message:'Confira os dados.')}}
+  async function saveWeight(){try{if(!selected)return;const kg=Number(weight.replace(',','.')),score=bcs?Number(bcs):null;if(!kg||kg<=0||score!==null&&(score<1||score>9))throw new Error('Informe peso válido e BCS entre 1 e 9.');if(editingWeight)await dogService.updateWeight(editingWeight,kg,score);else await dogService.addWeight(selected.id,kg,score);setWeight('');setBcs('');setEditingWeight(null);setWeights(await dogService.weights(selected.id));load()}catch(e){Alert.alert('Não foi possível registrar',e instanceof Error?e.message:'Confira os dados.')}}
+  const field=(label:string,key:keyof typeof form,placeholder='')=><><Text style={common.label}>{label}</Text><TextInput style={common.input} value={form[key]} onChangeText={v=>setForm({...form,[key]:v})} placeholder={placeholder} placeholderTextColor={colors.muted}/></>
+  return <SafeAreaView style={common.screen} edges={['top','left','right']}><ScrollView contentContainerStyle={common.content} keyboardShouldPersistTaps="handled">
+    <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}><View><Text style={common.eyebrow}>PLANTEL</Text><Text style={common.title}>Cães</Text></View><Pressable style={common.iconButton} onPress={()=>openForm()}><Ionicons name="add" size={24} color={colors.blue}/></Pressable></View>
+    <Text style={common.subtitle}>Toque em um animal para abrir a ficha completa.</Text>
+    <View style={{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:'#07101a',borderWidth:1,borderColor:colors.line,borderRadius:14,paddingHorizontal:13,marginBottom:16}}><Ionicons name="search" size={19} color={colors.muted}/><TextInput style={{flex:1,color:colors.text,paddingVertical:14}} value={query} onChangeText={setQuery} placeholder="Buscar por nome ou raça" placeholderTextColor={colors.muted}/></View>
+    <Pressable style={[common.button,{marginBottom:18}]} onPress={()=>openForm()}><Ionicons name="add-circle-outline" size={20} color="white"/><Text style={common.buttonText}>Cadastrar cão</Text></Pressable>
+    {visible.map(d=><Pressable key={d.id} style={common.card} onPress={()=>{setSelected(d);setMode('profile')}}><View style={{flexDirection:'row',alignItems:'center',gap:13}}><View style={{width:52,height:52,borderRadius:17,backgroundColor:d.sex==='female'?'#3a1d34':'#0b2744',alignItems:'center',justifyContent:'center'}}><Ionicons name="paw" size={24} color={d.sex==='female'?'#f18ac6':colors.blue}/></View><View style={{flex:1}}><Text style={{color:colors.text,fontSize:18,fontWeight:'900'}}>{d.name}</Text><Text style={common.muted}>{d.breed} • {age(d.birthDate)}</Text><Text style={{color:colors.green,fontSize:12,fontWeight:'800',marginTop:4}}>{d.weightKg.toLocaleString('pt-BR')} kg</Text></View><Ionicons name="chevron-forward" size={20} color={colors.muted}/></View></Pressable>)}
+    {!visible.length&&<View style={[common.card,{alignItems:'center',paddingVertical:35}]}><Ionicons name="paw-outline" size={40} color={colors.muted}/><Text style={{color:colors.text,fontWeight:'900',fontSize:18,marginTop:12}}>Nenhum cão encontrado</Text></View>}
+  </ScrollView>
+  <Modal visible={mode!==null} transparent animationType="slide" onRequestClose={close}><View style={common.modalBackdrop}><SafeAreaView style={common.sheet} edges={['bottom']}><ScrollView keyboardShouldPersistTaps="handled"><View style={{flexDirection:'row',alignItems:'center',marginBottom:18}}><View style={{flex:1}}><Text style={common.eyebrow}>{mode==='form'?(selected?'EDITAR PERFIL':'NOVO PERFIL'):mode==='tracking'?'ACOMPANHAMENTO':'FICHA DO ANIMAL'}</Text><Text style={[common.title,{fontSize:25}]}>{mode==='form'?(selected?`Editar ${selected.name}`:'Cadastrar cão'):selected?.name}</Text></View><Pressable style={common.iconButton} onPress={close}><Ionicons name="close" size={23} color={colors.text}/></Pressable></View>
+    {mode==='profile'&&selected&&<><View style={[common.card,{backgroundColor:'#091b2c'}]}><Text style={common.label}>DADOS PRINCIPAIS</Text>{[['Nome de registro',selected.registeredName||'Não informado'],['Nascimento',selected.birthDate.split('-').reverse().join('/')],['Idade',age(selected.birthDate)],['Sexo',selected.sex==='female'?'Fêmea':'Macho'],['Raça',selected.breed],['Cor',selected.color||'Não informada'],['Peso atual',`${selected.weightKg.toLocaleString('pt-BR')} kg`]].map(([l,v])=><View key={l} style={{flexDirection:'row',justifyContent:'space-between',gap:15,paddingVertical:10,borderBottomWidth:1,borderBottomColor:colors.line}}><Text style={common.muted}>{l}</Text><Text style={{color:colors.text,fontWeight:'800',flex:1,textAlign:'right'}}>{v}</Text></View>)}{selected.notes?<Text style={[common.muted,{marginTop:12}]}>{selected.notes}</Text>:null}</View><View style={[common.row,{flexWrap:'nowrap'}]}><Pressable style={[common.actionButton,{flex:1}]} onPress={()=>openForm(selected)}><Ionicons name="create-outline" size={18} color={colors.blue}/><Text style={{color:colors.text,fontWeight:'800'}}>Editar</Text></Pressable><Pressable style={[common.actionButton,{flex:1}]} onPress={()=>void openTracking(selected)}><Ionicons name="trending-up" size={18} color={colors.green}/><Text style={{color:colors.text,fontWeight:'800'}}>Pesagens</Text></Pressable></View><Pressable style={[common.actionButton,{marginTop:10,borderColor:'#67303b'}]} onPress={()=>Alert.alert('Excluir cão',`Excluir ${selected.name}?`,[{text:'Cancelar'},{text:'Excluir',style:'destructive',onPress:()=>void dogService.remove(selected.id).then(()=>{close();load()})}])}><Ionicons name="trash-outline" size={18} color={colors.red}/><Text style={{color:colors.red,fontWeight:'900'}}>Excluir cão</Text></Pressable></>}
+    {mode==='form'&&<>{field('NOME *','name','Nome do cão')}{field('NOME DE REGISTRO','registeredName','Nome no pedigree')}{field('RAÇA *','breed')}{field('NASCIMENTO (AAAA-MM-DD) *','birthDate','2026-07-04')}{!selected&&field('PESO INICIAL (KG) *','weight','4,6')}{field('COR','color','Ex.: blue tri')}<Text style={common.label}>SEXO</Text><View style={[common.row,{flexWrap:'nowrap',marginBottom:14}]}>{(['male','female'] as const).map(s=><Pressable key={s} onPress={()=>setForm({...form,sex:s})} style={[common.actionButton,{flex:1},form.sex===s&&common.selected]}><Ionicons name={s==='male'?'male':'female'} size={18} color={colors.blue}/><Text style={{color:colors.text,fontWeight:'800'}}>{s==='male'?'Macho':'Fêmea'}</Text></Pressable>)}</View>{field('OBSERVAÇÕES','notes','Informações importantes')}<Pressable style={common.button} onPress={()=>void saveDog()}><Ionicons name="save-outline" size={19} color="white"/><Text style={common.buttonText}>Salvar cão</Text></Pressable></>}
+    {mode==='tracking'&&selected&&<><View style={common.card}><Text style={common.label}>{editingWeight?'EDITAR PESAGEM':'NOVA PESAGEM — KG'}</Text><TextInput style={common.input} value={weight} onChangeText={setWeight} keyboardType="decimal-pad" placeholder="4,650" placeholderTextColor={colors.muted}/><Text style={common.label}>ESCORE CORPORAL (1–9)</Text><TextInput style={common.input} value={bcs} onChangeText={setBcs} keyboardType="number-pad" placeholder="4 ou 5 é a faixa ideal" placeholderTextColor={colors.muted}/><Pressable style={common.button} onPress={()=>void saveWeight()}><Ionicons name="scale-outline" size={19} color="white"/><Text style={common.buttonText}>{editingWeight?'Salvar alteração':'Registrar pesagem'}</Text></Pressable></View>{[...weights].reverse().map((w,i)=>{const prev=[...weights].reverse()[i+1],delta=prev?w.weightGrams-prev.weightGrams:null;return <View key={w.id} style={common.card}><View style={{flexDirection:'row',justifyContent:'space-between'}}><View><Text style={common.value}>{(w.weightGrams/1000).toLocaleString('pt-BR')} kg</Text><Text style={common.muted}>{new Date(`${w.date}T12:00`).toLocaleDateString('pt-BR')} • BCS {w.bodyConditionScore??'—'}/9</Text></View>{delta!==null&&<Text style={{color:delta>=0?colors.green:colors.red,fontWeight:'900'}}>{delta>=0?'+':''}{(delta/1000).toLocaleString('pt-BR')} kg</Text>}</View><View style={[common.row,{marginTop:12}]}><Pressable style={common.actionButton} onPress={()=>{setWeight(String(w.weightGrams/1000).replace('.',','));setBcs(String(w.bodyConditionScore??''));setEditingWeight(w.id)}}><Ionicons name="create-outline" size={17} color={colors.blue}/><Text style={{color:colors.text}}>Editar</Text></Pressable><Pressable style={common.actionButton} onPress={()=>Alert.alert('Excluir pesagem','Confirmar exclusão?',[{text:'Cancelar'},{text:'Excluir',style:'destructive',onPress:()=>void dogService.removeWeight(w.id).then(()=>openTracking(selected))}])}><Ionicons name="trash-outline" size={17} color={colors.red}/><Text style={{color:colors.red}}>Excluir</Text></Pressable></View></View>})}</>}
+    </ScrollView></SafeAreaView></View></Modal>
+  </SafeAreaView>
 }

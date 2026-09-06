@@ -8,6 +8,8 @@ import {
   View,
 } from "react-native";
 import { useFocusEffect } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import {
   dogService,
   reminderService,
@@ -64,7 +66,7 @@ export default function Agenda() {
     }
   }
   return (
-    <ScrollView style={common.screen} keyboardShouldPersistTaps="handled">
+    <SafeAreaView style={common.screen} edges={["top","left","right"]}><ScrollView contentContainerStyle={common.content} keyboardShouldPersistTaps="handled">
       <Text style={common.eyebrow}>CUIDADOS</Text>
       <Text style={common.title}>Agenda</Text>
       <Text style={common.subtitle}>
@@ -97,7 +99,7 @@ export default function Agenda() {
           placeholder="2026-09-10T14:00"
           placeholderTextColor={colors.muted}
         />
-        <Pressable style={common.button} onPress={() => void save()}>
+        <Pressable style={common.button} onPress={() => void save()}><Ionicons name="notifications-outline" size={19} color="white" />
           <Text style={common.buttonText}>{editing ? "Salvar alterações" : "Agendar notificação"}</Text>
         </Pressable>
       </View>
@@ -112,6 +114,6 @@ export default function Agenda() {
           <View style={[common.row,{marginTop:10}]}><Pressable onPress={()=>{setEditing(item);setDogId(item.dogId);setTitle(item.title);const d=new Date(item.dateTime);setDateTime(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}T${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`)}}><Text style={{color:colors.blue}}>Editar</Text></Pressable><Pressable onPress={()=>Alert.alert("Excluir lembrete","Confirma a exclusão?",[{text:"Cancelar"},{text:"Excluir",style:"destructive",onPress:()=>void cancelCareNotification(item.notificationId).then(()=>reminderService.remove(item.id)).then(load)}])}><Text style={{color:colors.red}}>Excluir</Text></Pressable></View>
         </View>
       ))}
-    </ScrollView>
+    </ScrollView></SafeAreaView>
   );
 }

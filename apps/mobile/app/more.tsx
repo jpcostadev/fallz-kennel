@@ -11,6 +11,9 @@ import type { User } from "firebase/auth";
 import { login, logout, observeUser, synchronize } from "../src/firebase";
 import { syncService } from "../src/database";
 import { colors, common } from "../src/theme";
+import { SafeAreaView } from "react-native-safe-area-context";
+import * as Updates from "expo-updates";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function More() {
   const [user, setUser] = useState<User | null>(null),
@@ -52,13 +55,19 @@ export default function More() {
       setBusy(false);
     }
   }
+  async function checkUpdate() {
+    if (__DEV__) { Alert.alert("Atualizações", "Disponível no APK instalado."); return; }
+    try { setBusy(true); const update=await Updates.checkForUpdateAsync(); if(!update.isAvailable){Alert.alert("Tudo atualizado","Você já está na versão mais recente.");return} await Updates.fetchUpdateAsync(); Alert.alert("Atualização pronta","Reiniciar agora para aplicar?",[{text:"Depois"},{text:"Reiniciar",onPress:()=>void Updates.reloadAsync()}]); }
+    catch(e){Alert.alert("Falha na atualização",e instanceof Error?e.message:"Tente novamente.")} finally{setBusy(false)}
+  }
   return (
-    <ScrollView style={common.screen} keyboardShouldPersistTaps="handled">
+    <SafeAreaView style={common.screen} edges={["top","left","right"]}><ScrollView contentContainerStyle={common.content} keyboardShouldPersistTaps="handled">
       <Text style={common.eyebrow}>FIREBASE</Text>
       <Text style={common.title}>Sincronização</Text>
       <Text style={common.subtitle}>
         A mesma conta e os mesmos dados do Desktop.
       </Text>
+      <View style={common.card}><Text style={{color:colors.text,fontWeight:"800",fontSize:17}}>Atualização do aplicativo</Text><Text style={[common.muted,{marginTop:8,marginBottom:14}]}>Baixe melhorias sem reinstalar o APK.</Text><Pressable style={common.button} disabled={busy} onPress={()=>void checkUpdate()}><Ionicons name="cloud-download-outline" size={19} color="white"/><Text style={common.buttonText}>Verificar atualização</Text></Pressable></View>
       <View style={common.card}>
         {user ? (
           <>
@@ -129,6 +138,6 @@ export default function More() {
           A senha vai diretamente ao Firebase e não é gravada no SQLite.
         </Text>
       </View>
-    </ScrollView>
+    </ScrollView></SafeAreaView>
   );
 }

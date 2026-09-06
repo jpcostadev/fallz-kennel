@@ -2,14 +2,32 @@ import { join } from 'node:path'
 import { writeFile } from 'node:fs/promises'
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { electronApp, is } from '@electron-toolkit/utils'
-import { closeDatabase, dashboardSummary, dogRepository, measurementRepository, moduleRecordRepository, openDatabase, settingsRepository, syncRepository } from './database'
+import { closeDatabase, dashboardSummary, dogRepository, feedingRepository, measurementRepository, moduleRecordRepository, openDatabase, settingsRepository, syncRepository } from './database'
 import { createDogSchema } from '../shared/dog'
 import { kennelSettingsSchema, moduleRecordInputSchema, operationalModuleSchema, recordIdSchema } from '../shared/module'
 import { measurementInputSchema } from '../shared/measurement'
 import { syncEventSchema } from '../shared/sync'
 import { z } from 'zod'
+import { feedingPlanInputSchema } from '../shared/feeding'
+import electronUpdater from 'electron-updater'
+
+const { autoUpdater } = electronUpdater
+autoUpdater.autoDownload = true
+autoUpdater.autoInstallOnAppQuit = true
 
 function registerIpc(): void {
+  ipcMain.handle('updater:check', async () => {
+    if (!app.isPackaged) return { status:'development', message:'Atualizações são verificadas no aplicativo instalado.' }
+    try {
+      const result = await autoUpdater.checkForUpdates()
+      const version = result?.updateInfo.version
+      if (!version || version === app.getVersion()) return { status:'current', message:`Você já está na versão mais recente (${app.getVersion()}).` }
+      return { status:'downloading', version, message:`Versão ${version} encontrada. O download começou automaticamente.` }
+    } catch (error) {
+      return { status:'error', message:error instanceof Error ? error.message : 'Não foi possível consultar atualizações.' }
+    }
+  })
+  ipcMain.handle('updater:install', () => autoUpdater.quitAndInstall(false, true))
   ipcMain.handle('dogs:list', () => dogRepository.findAll())
   ipcMain.handle('dogs:create', (_event, rawInput: unknown) => dogRepository.create(createDogSchema.parse(rawInput)))
   ipcMain.handle('dogs:update', (_event, id:unknown,rawInput:unknown) => dogRepository.update(recordIdSchema.parse(id),createDogSchema.parse(rawInput)))
@@ -32,6 +50,9 @@ function registerIpc(): void {
   ipcMain.handle('measurements:create', (_event, input: unknown) => measurementRepository.create(measurementInputSchema.parse(input)))
   ipcMain.handle('measurements:update', (_event, id: unknown, input: unknown) => measurementRepository.update(recordIdSchema.parse(id), measurementInputSchema.parse(input)))
   ipcMain.handle('measurements:remove', (_event, id: unknown) => measurementRepository.softDelete(recordIdSchema.parse(id)))
+  ipcMain.handle('feeding:list', () => feedingRepository.findAll())
+  ipcMain.handle('feeding:save', (_event, input:unknown) => feedingRepository.save(feedingPlanInputSchema.parse(input)))
+  ipcMain.handle('feeding:remove', (_event, id:unknown) => feedingRepository.softDelete(recordIdSchema.parse(id)))
   ipcMain.handle('sync:summary', () => syncRepository.summary())
   ipcMain.handle('sync:pending', () => syncRepository.pending())
   ipcMain.handle('sync:mark-uploaded', (_event, ids: unknown) => syncRepository.markUploaded(z.array(recordIdSchema).parse(ids)))
@@ -81,6 +102,7 @@ app.whenReady().then(() => {
   openDatabase()
   registerIpc()
   createWindow()
+  if (app.isPackaged) setTimeout(() => { void autoUpdater.checkForUpdatesAndNotify() }, 5000)
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
 })
 

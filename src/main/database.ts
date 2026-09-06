@@ -7,7 +7,7 @@ import { dogRecordSchema, type CreateDogInput, type DashboardSummary, type Dog }
 import { moduleRecordSchema, type KennelSettings, type ModuleRecord, type ModuleRecordInput, type OperationalModule } from '../shared/module'
 import { measurementRecordSchema, type Measurement, type MeasurementInput } from '../shared/measurement'
 import type { SyncEvent, SyncSummary } from '../shared/sync'
-import { feedingPlanRecordSchema } from '../shared/feeding'
+import { feedingPlanRecordSchema, type FeedingPlanInput, type FeedingPlanRecord } from '../shared/feeding'
 
 type DogRow = {
   id: string
@@ -272,6 +272,14 @@ export function dashboardSummary(): DashboardSummary {
     FROM dogs WHERE deleted_at IS NULL AND status != 'deceased'
   `).get() as DashboardSummary
   return { activeDogs: row.activeDogs, males: row.males ?? 0, females: row.females ?? 0, puppies: row.puppies ?? 0 }
+}
+
+type FeedingRow={id:string;dog_id:string;food_name:string;kcal_per_kg:number;daily_grams:number;grams_per_meal:number;meals_per_day:number;times_json:string;life_stage:FeedingPlanRecord['lifeStage'];goal:FeedingPlanRecord['goal'];adjustment_percent:number;created_at:string;updated_at:string;deleted_at:string|null;version:number;device_id:string}
+const mapFeeding=(r:FeedingRow):FeedingPlanRecord=>feedingPlanRecordSchema.parse({id:r.id,dogId:r.dog_id,foodName:r.food_name,kcalPerKg:r.kcal_per_kg,dailyGrams:r.daily_grams,gramsPerMeal:r.grams_per_meal,mealsPerDay:r.meals_per_day,times:JSON.parse(r.times_json),lifeStage:r.life_stage,goal:r.goal,adjustmentPercent:r.adjustment_percent,createdAt:r.created_at,updatedAt:r.updated_at,deletedAt:r.deleted_at,version:r.version,deviceId:r.device_id})
+export const feedingRepository={
+  findAll():FeedingPlanRecord[]{return (openDatabase().prepare('SELECT * FROM feeding_plans WHERE deleted_at IS NULL ORDER BY updated_at DESC').all() as FeedingRow[]).map(mapFeeding)},
+  save(input:FeedingPlanInput):FeedingPlanRecord{const db=openDatabase(),existing=db.prepare('SELECT * FROM feeding_plans WHERE dog_id=? AND deleted_at IS NULL').get(input.dogId) as FeedingRow|undefined,now=new Date().toISOString();const plan:FeedingPlanRecord={...input,id:existing?.id??randomUUID(),createdAt:existing?.created_at??now,updatedAt:now,deletedAt:null,version:(existing?.version??0)+1,deviceId:existing?.device_id??deviceId()};db.transaction(()=>{db.prepare(`INSERT INTO feeding_plans(id,dog_id,food_name,kcal_per_kg,daily_grams,grams_per_meal,meals_per_day,times_json,life_stage,goal,adjustment_percent,created_at,updated_at,deleted_at,version,device_id) VALUES(@id,@dogId,@foodName,@kcalPerKg,@dailyGrams,@gramsPerMeal,@mealsPerDay,@timesJson,@lifeStage,@goal,@adjustmentPercent,@createdAt,@updatedAt,@deletedAt,@version,@deviceId) ON CONFLICT(id) DO UPDATE SET food_name=excluded.food_name,kcal_per_kg=excluded.kcal_per_kg,daily_grams=excluded.daily_grams,grams_per_meal=excluded.grams_per_meal,times_json=excluded.times_json,life_stage=excluded.life_stage,goal=excluded.goal,adjustment_percent=excluded.adjustment_percent,updated_at=excluded.updated_at,version=excluded.version`).run({...plan,timesJson:JSON.stringify(plan.times)});db.prepare(`INSERT INTO sync_queue(id,entity_type,entity_id,operation,payload,created_at) VALUES(?,'feeding_plans',?,?,?,?)`).run(randomUUID(),plan.id,existing?'update':'create',JSON.stringify(plan),now)})();return plan},
+  softDelete(id:string):void{const db=openDatabase(),row=db.prepare('SELECT * FROM feeding_plans WHERE id=? AND deleted_at IS NULL').get(id) as FeedingRow|undefined;if(!row)throw new Error('Plano não encontrado.');const plan={...mapFeeding(row),deletedAt:new Date().toISOString(),updatedAt:new Date().toISOString(),version:row.version+1};db.transaction(()=>{db.prepare('UPDATE feeding_plans SET deleted_at=@deletedAt,updated_at=@updatedAt,version=@version WHERE id=@id').run(plan);db.prepare(`INSERT INTO sync_queue(id,entity_type,entity_id,operation,payload,created_at) VALUES(?,'feeding_plans',?,'delete',?,?)`).run(randomUUID(),id,JSON.stringify(plan),plan.updatedAt)})()}
 }
 
 type ModuleRecordRow = {

@@ -2,6 +2,7 @@ import { z } from 'zod'
 import type { ModuleApi } from './module'
 import type { MeasurementApi } from './measurement'
 import type { SyncApi } from './sync'
+import type { FeedingApi } from './feeding'
 
 export const dogSexSchema = z.enum(['male', 'female'])
 export const dogStatusSchema = z.enum(['puppy', 'young', 'adult', 'breeder', 'retired', 'sold', 'deceased'])
@@ -40,7 +41,7 @@ export interface DashboardSummary {
   puppies: number
 }
 
-export interface FallzApi extends ModuleApi, MeasurementApi, SyncApi {
+export interface FallzApi extends ModuleApi, MeasurementApi, SyncApi, FeedingApi {
   dogs: {
     list(): Promise<Dog[]>
     create(input: CreateDogInput): Promise<Dog>
@@ -48,4 +49,8 @@ export interface FallzApi extends ModuleApi, MeasurementApi, SyncApi {
     remove(id:string):Promise<void>
   }
   dashboard: { summary(): Promise<DashboardSummary> }
+  updater: {
+    check(): Promise<{ status: string; message: string; version?: string }>
+    install(): Promise<void>
+  }
 }
