@@ -43,6 +43,7 @@ function App(): React.JSX.Element {
   const [page, setPage] = useState<Page>('dashboard')
   const [quickCreate, setQuickCreate] = useState(0)
   const [selectedDog, setSelectedDog] = useState<Dog | null>(null)
+  const [searchRecords, setSearchRecords] = useState<ModuleRecord[]>([])
 
   async function refresh(): Promise<void> {
     const [dogList, dashboard] = await Promise.all([window.fallz.dogs.list(), window.fallz.dashboard.summary()])
@@ -51,11 +52,17 @@ function App(): React.JSX.Element {
 
   useEffect(() => { void refresh() }, [])
   useEffect(() => {
+    void Promise.all((['health', 'breeding', 'clients', 'finance', 'agenda'] as OperationalModule[]).map((module) => window.fallz.records.list(module))).then((groups) => setSearchRecords(groups.flat()))
+  }, [])
+  useEffect(() => {
     const handleShortcut = (event: KeyboardEvent): void => { if (event.ctrlKey && event.key.toLowerCase() === 'k') { event.preventDefault(); document.getElementById('global-search')?.focus() } }
     window.addEventListener('keydown', handleShortcut)
     return () => window.removeEventListener('keydown', handleShortcut)
   }, [])
   const filteredDogs = useMemo(() => dogs.filter((dog) => `${dog.name} ${dog.breed} ${dog.color}`.toLowerCase().includes(search.toLowerCase())), [dogs, search])
+  const normalizedSearch = search.trim().toLocaleLowerCase('pt-BR')
+  const globalDogResults = normalizedSearch ? dogs.filter((dog) => `${dog.name} ${dog.registeredName} ${dog.breed} ${dog.color}`.toLocaleLowerCase('pt-BR').includes(normalizedSearch)).slice(0, 5) : []
+  const globalRecordResults = normalizedSearch ? searchRecords.filter((record) => `${record.title} ${record.category} ${record.description} ${record.phone} ${record.whatsapp} ${record.email}`.toLocaleLowerCase('pt-BR').includes(normalizedSearch)).slice(0, 7) : []
 
   return (
     <div className="app-shell">
@@ -81,7 +88,7 @@ function App(): React.JSX.Element {
       <main>
         <header className="topbar">
           <button className="icon-button menu"><Menu /></button>
-          <div className="search"><Search /><input id="global-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar cães, clientes, documentos..." /><kbd>Ctrl K</kbd></div>
+          <div className="search"><Search /><input id="global-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar cães, clientes, documentos..." /><kbd>Ctrl K</kbd>{normalizedSearch && <div className="global-search-results">{globalDogResults.map((dog) => <button type="button" key={dog.id} onClick={() => { setSelectedDog(dog); setSearch('') }}><DogIcon /><span><strong>{dog.name}</strong><small>{dog.breed} • Abrir ficha completa</small></span><ChevronRight /></button>)}{globalRecordResults.map((record) => <button type="button" key={record.id} onClick={() => { setPage(record.module); setSearch('') }}><Search /><span><strong>{record.title}</strong><small>{pageInfo[record.module].title} • {record.category}</small></span><ChevronRight /></button>)}{!globalDogResults.length && !globalRecordResults.length && <p>Nenhum cão, cliente ou registro encontrado.</p>}</div>}</div>
           <button className="icon-button" title="Abrir agenda" onClick={() => setPage('agenda')}><Bell /><span className="notification-dot" /></button>
           <div className="avatar">FK</div>
         </header>
@@ -132,7 +139,7 @@ function DogsPage({ dogs, loading, onAdd, onChanged }: { dogs: Dog[]; loading: b
     <section className="section-tabs"><button className={filter === 'all' ? 'active' : ''} onClick={() => setFilter('all')}>Todos</button><button className={filter === 'male' ? 'active' : ''} onClick={() => setFilter('male')}>Machos</button><button className={filter === 'female' ? 'active' : ''} onClick={() => setFilter('female')}>Fêmeas</button><button className={filter === 'puppy' ? 'active' : ''} onClick={() => setFilter('puppy')}>Filhotes</button></section>
     <section className="panel page-panel">
       <div className="panel-header"><div><h2>Todos os cães</h2><p>{visibleDogs.length} {visibleDogs.length === 1 ? 'perfil cadastrado' : 'perfis cadastrados'}</p></div></div>
-      {loading ? <div className="empty-state"><span className="loader" />Carregando...</div> : visibleDogs.length ? <div className="dog-list">{visibleDogs.map((dog) => <div key={dog.id}><DogRow dog={dog} onClick={() => setSelectedDog(dog)} /><div className="record-actions"><button className="row-action" title="Editar cão" onClick={() => setEditingDog(dog)}><Pencil /></button><button className="row-action danger" title="Excluir cão" onClick={async () => { if (confirm(`Excluir ${dog.name}?`)) { await window.fallz.dogs.remove(dog.id); await onChanged() } }}><Trash2 /></button></div></div>)}</div> : <div className="empty-state"><div className="empty-icon"><DogIcon /></div><h3>Nenhum cão nesta categoria</h3><p>Cadastre um cão ou selecione outro filtro.</p><button className="secondary-button" onClick={onAdd}><Plus /> Cadastrar cão</button></div>}
+      {loading ? <div className="empty-state"><span className="loader" />Carregando...</div> : visibleDogs.length ? <div className="dog-list">{visibleDogs.map((dog) => <div className="dog-list-item" key={dog.id}><DogRow dog={dog} onClick={() => setSelectedDog(dog)} /><div className="dog-row-actions"><button className="row-action" type="button" aria-label={`Editar ${dog.name}`} title="Editar cão" onClick={() => setEditingDog(dog)}><Pencil /></button><button className="row-action danger" type="button" aria-label={`Excluir ${dog.name}`} title="Excluir cão" onClick={async () => { if (confirm(`Excluir ${dog.name}?`)) { await window.fallz.dogs.remove(dog.id); await onChanged() } }}><Trash2 /></button></div></div>)}</div> : <div className="empty-state"><div className="empty-icon"><DogIcon /></div><h3>Nenhum cão nesta categoria</h3><p>Cadastre um cão ou selecione outro filtro.</p><button className="secondary-button" onClick={onAdd}><Plus /> Cadastrar cão</button></div>}
     </section>
     {selectedDog && <DogProfileDialog dog={selectedDog} onClose={() => setSelectedDog(null)} />}
     {editingDog !== undefined && <DogDialog dog={editingDog} onClose={() => setEditingDog(undefined)} onCreated={async () => { setEditingDog(undefined); await onChanged() }} />}

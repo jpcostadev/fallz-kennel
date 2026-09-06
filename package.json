@@ -1,6 +1,6 @@
 {
   "name": "fallz-kennel",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "private": true,
   "description": "Gestão offline-first para o Fallz Kennel",
   "main": "out/main/index.js",
@@ -64,7 +64,13 @@
       "out/**/*",
       "package.json"
     ],
-    "publish": [{ "provider": "github", "owner": "jpcostadev", "repo": "fallz-kennel" }],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "jpcostadev",
+        "repo": "fallz-kennel"
+      }
+    ],
     "asarUnpack": [
       "**/node_modules/better-sqlite3/**/*"
     ],
