@@ -1,0 +1,15 @@
+packages:
+  - apps/*
+  - packages/*
+
+allowBuilds:
+  '@firebase/util': true
+  better-sqlite3: true
+  dtrace-provider: false
+  electron-winstaller: true
+  esbuild: true
+  protobufjs: true
+onlyBuiltDependencies:
+  - better-sqlite3
+  - electron
+  - esbuild

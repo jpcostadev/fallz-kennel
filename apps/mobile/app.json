@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "Fallz Kennel",
+    "slug": "fallz-kennel",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "../../fallz-kennel.png",
+    "scheme": "fallzkennel",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "android": {
+      "package": "com.fallzkennel.mobile",
+      "permissions": [
+        "SCHEDULE_EXACT_ALARM",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
+      ]
+    },
+    "ios": {
+      "bundleIdentifier": "com.fallzkennel.mobile",
+      "supportsTablet": true
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      "expo-notifications",
+      "expo-status-bar"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
