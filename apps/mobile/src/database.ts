@@ -1106,18 +1106,20 @@ export const syncService = {
   async apply(events: CloudEvent[]) {
     const db = await getDatabase();
     let count = 0;
-    await db.withTransactionAsync(async () => {
+    await db.withExclusiveTransactionAsync(async (transaction) => {
       for (const event of events) {
         if (
-          await db.getFirstAsync(
+          await transaction.getFirstAsync(
             "SELECT 1 FROM sync_applied_events WHERE event_id=?",
             event.id,
           )
         )
           continue;
         const p = event.payload;
+        if ((event.entityType === "dog_measurements" || event.entityType === "feeding_plans") &&
+          !(await transaction.getFirstAsync("SELECT 1 FROM dogs WHERE id=?", String(p.dogId)))) continue;
         if (event.entityType === "dogs") {
-          await db.runAsync(
+          await transaction.runAsync(
             `INSERT INTO dogs(id,name,birth_date,weight_kg,breed,sex,registered_name,color,status,notes,created_at,updated_at,deleted_at,version,device_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,birth_date=excluded.birth_date,breed=excluded.breed,sex=excluded.sex,registered_name=excluded.registered_name,color=excluded.color,status=excluded.status,notes=excluded.notes,updated_at=excluded.updated_at,deleted_at=excluded.deleted_at,version=excluded.version,device_id=excluded.device_id WHERE excluded.version>dogs.version OR (excluded.version=dogs.version AND excluded.updated_at>dogs.updated_at)`,
             String(p.id),
             String(p.name),
@@ -1136,7 +1138,7 @@ export const syncService = {
             String(p.deviceId),
           );
         } else if (event.entityType === "dog_measurements") {
-          await db.runAsync(
+          await transaction.runAsync(
             `INSERT INTO weight_records(id,dog_id,date,weight_grams,age_days,height,chest_circumference,head_circumference,body_condition_score,notes,created_at,updated_at,deleted_at,version,device_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET dog_id=excluded.dog_id,date=excluded.date,weight_grams=excluded.weight_grams,age_days=excluded.age_days,height=excluded.height,chest_circumference=excluded.chest_circumference,head_circumference=excluded.head_circumference,body_condition_score=excluded.body_condition_score,notes=excluded.notes,updated_at=excluded.updated_at,deleted_at=excluded.deleted_at,version=excluded.version,device_id=excluded.device_id WHERE excluded.version>weight_records.version OR (excluded.version=weight_records.version AND excluded.updated_at>weight_records.updated_at)`,
             String(p.id),
             String(p.dogId),
@@ -1154,18 +1156,18 @@ export const syncService = {
             Number(p.version),
             String(p.deviceId),
           );
-          const latestWeight = await db.getFirstAsync<{ weight_grams: number }>(
+          const latestWeight = await transaction.getFirstAsync<{ weight_grams: number }>(
             "SELECT weight_grams FROM weight_records WHERE dog_id=? AND deleted_at IS NULL ORDER BY date DESC,updated_at DESC LIMIT 1",
             String(p.dogId),
           );
           if (latestWeight)
-            await db.runAsync(
+            await transaction.runAsync(
               "UPDATE dogs SET weight_kg=? WHERE id=?",
               latestWeight.weight_grams / 1000,
               String(p.dogId),
             );
         } else if (event.entityType === "feeding_plans") {
-          await db.runAsync(
+          await transaction.runAsync(
             `INSERT INTO feeding_plans(id,dog_id,food_name,kcal_per_kg,daily_grams,grams_per_meal,meals_per_day,times_json,life_stage,goal,adjustment_percent,created_at,updated_at,deleted_at,version,device_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET dog_id=excluded.dog_id,food_name=excluded.food_name,kcal_per_kg=excluded.kcal_per_kg,daily_grams=excluded.daily_grams,grams_per_meal=excluded.grams_per_meal,meals_per_day=excluded.meals_per_day,times_json=excluded.times_json,life_stage=excluded.life_stage,goal=excluded.goal,adjustment_percent=excluded.adjustment_percent,updated_at=excluded.updated_at,deleted_at=excluded.deleted_at,version=excluded.version,device_id=excluded.device_id WHERE excluded.version>feeding_plans.version OR (excluded.version=feeding_plans.version AND excluded.updated_at>feeding_plans.updated_at)`,
             String(p.id),
             String(p.dogId),
@@ -1185,7 +1187,7 @@ export const syncService = {
             String(p.deviceId),
           );
         } else if (event.entityType === "module_records") {
-          await db.runAsync(
+          await transaction.runAsync(
             `INSERT INTO module_records(id,module,title,category,date,description,amount,dog_id,phone,whatsapp,email,transaction_type,quantity,unit,created_at,updated_at,deleted_at,version,device_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET module=excluded.module,title=excluded.title,category=excluded.category,date=excluded.date,description=excluded.description,amount=excluded.amount,dog_id=excluded.dog_id,phone=excluded.phone,whatsapp=excluded.whatsapp,email=excluded.email,transaction_type=excluded.transaction_type,quantity=excluded.quantity,unit=excluded.unit,updated_at=excluded.updated_at,deleted_at=excluded.deleted_at,version=excluded.version,device_id=excluded.device_id WHERE excluded.version>module_records.version OR (excluded.version=module_records.version AND excluded.updated_at>module_records.updated_at)`,
             String(p.id),
             String(p.module),
@@ -1208,14 +1210,14 @@ export const syncService = {
             String(p.deviceId),
           );
         }
-        await db.runAsync(
+        await transaction.runAsync(
           "INSERT INTO sync_applied_events(event_id,applied_at) VALUES(?,?)",
           event.id,
           new Date().toISOString(),
         );
         count++;
       }
-      await db.runAsync(
+      await transaction.runAsync(
         "INSERT INTO app_settings(key,value) VALUES('last_sync',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
         new Date().toISOString(),
       );

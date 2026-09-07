@@ -14,18 +14,20 @@ export async function importAgendaEvents(
     const p = event.payload,
       time = String(p.description ?? "").match(/(\d{2}):(\d{2})/),
       dateTime = `${String(p.date)}T${time ? `${time[1]}:${time[2]}` : "09:00"}:00`;
-    await db.withTransactionAsync(async () => {
-      await db.runAsync(
+    const dogId = p.dogId ? String(p.dogId) : null;
+    if (dogId && !(await db.getFirstAsync("SELECT 1 FROM dogs WHERE id=?", dogId))) continue;
+    await db.withExclusiveTransactionAsync(async (transaction) => {
+      await transaction.runAsync(
         "INSERT OR IGNORE INTO reminders(id,dog_id,title,date_time,type,notification_id,created_at) VALUES(?,?,?,?,?,?,?)",
         String(p.id),
-        p.dogId ? String(p.dogId) : null,
+        dogId,
         String(p.title),
         dateTime,
         "appointment",
         null,
         String(p.createdAt),
       );
-      await db.runAsync(
+      await transaction.runAsync(
         "INSERT INTO sync_applied_events(event_id,applied_at) VALUES(?,?)",
         event.id,
         new Date().toISOString(),

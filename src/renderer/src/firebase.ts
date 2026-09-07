@@ -48,7 +48,10 @@ export async function synchronizeFirebase(): Promise<{ uploaded: number; downloa
     const parsed = syncEventSchema.safeParse(item.data())
     if (parsed.success) remote.push(parsed.data)
   })
-  remote.sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))
+  remote.sort((a, b) => {
+    const priority = (event: SyncEvent): number => event.entityType === 'dogs' ? 0 : 1
+    return priority(a) - priority(b) || a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id)
+  })
   const downloaded = await window.fallz.sync.apply(remote)
   const summary = await window.fallz.sync.summary()
   return { uploaded: pending.length, downloaded, pending: summary.pending }

@@ -83,10 +83,13 @@ export async function synchronize() {
       remote.push(value as CloudEvent);
   });
   remote.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  const agenda = remote.filter((x) => x.entityType === "agenda"),
-    records = remote.filter((x) => x.entityType !== "agenda");
+  const dogs = remote.filter((x) => x.entityType === "dogs"),
+    agenda = remote.filter((x) => x.entityType === "agenda"),
+    records = remote.filter((x) => x.entityType !== "agenda" && x.entityType !== "dogs");
   const downloaded =
-    (await importAgendaEvents(agenda)) + (await syncService.apply(records));
+    (await syncService.apply(dogs)) +
+    (await importAgendaEvents(agenda)) +
+    (await syncService.apply(records));
   return {
     uploaded: pending.length,
     downloaded,

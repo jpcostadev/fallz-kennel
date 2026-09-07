@@ -430,10 +430,12 @@ export const syncRepository = {
   apply(events: SyncEvent[]): number {
     const db = openDatabase(); let applied = 0
     const already = db.prepare('SELECT 1 FROM sync_applied_events WHERE event_id=?')
+    const dogExists = db.prepare('SELECT 1 FROM dogs WHERE id=?')
     const mark = db.prepare('INSERT OR IGNORE INTO sync_applied_events(event_id,applied_at) VALUES(?,?)')
     db.transaction(() => {
       for (const event of events) {
         if (already.get(event.id)) continue
+        if ((event.entityType === 'dog_measurements' || event.entityType === 'feeding_plans') && !dogExists.get(String(event.payload.dogId))) continue
         if (event.entityType === 'dogs') {
           const dog = dogRecordSchema.parse(event.payload)
           db.prepare(`INSERT INTO dogs (id,name,registered_name,sex,birth_date,breed,color,status,notes,created_at,updated_at,deleted_at,version,device_id) VALUES (@id,@name,@registeredName,@sex,@birthDate,@breed,@color,@status,@notes,@createdAt,@updatedAt,@deletedAt,@version,@deviceId) ON CONFLICT(id) DO UPDATE SET name=excluded.name,registered_name=excluded.registered_name,sex=excluded.sex,birth_date=excluded.birth_date,breed=excluded.breed,color=excluded.color,status=excluded.status,notes=excluded.notes,updated_at=excluded.updated_at,deleted_at=excluded.deleted_at,version=excluded.version,device_id=excluded.device_id WHERE excluded.version>dogs.version OR (excluded.version=dogs.version AND excluded.updated_at>dogs.updated_at)`).run(dog)
