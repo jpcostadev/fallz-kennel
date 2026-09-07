@@ -13,8 +13,8 @@ import { login, logout, observeUser, synchronize } from "../src/firebase";
 import { syncService } from "../src/database";
 import { colors, common } from "../src/theme";
 import { SafeAreaView } from "react-native-safe-area-context";
-import * as Updates from "expo-updates";
 import { Ionicons } from "@expo/vector-icons";
+import { checkAndInstallUpdate, updateStageLabel, type UpdateStage } from '../src/app-updates';
 
 export default function More() {
   const [user, setUser] = useState<User | null>(null),
@@ -24,6 +24,7 @@ export default function More() {
     [status, setStatus] = useState(""),
     [pending, setPending] = useState(0);
   const [refreshing,setRefreshing]=useState(false);
+  const [updateStage,setUpdateStage]=useState<UpdateStage>('idle');
   useEffect(() => {
     void syncService.summary().then((s) => setPending(s.pending));
     return observeUser(setUser);
@@ -58,9 +59,7 @@ export default function More() {
     }
   }
   async function checkUpdate() {
-    if (__DEV__) { Alert.alert("Atualizações", "Disponível no APK instalado."); return; }
-    try { setBusy(true); const update=await Updates.checkForUpdateAsync(); if(!update.isAvailable){Alert.alert("Tudo atualizado","Você já está na versão mais recente.");return} await Updates.fetchUpdateAsync(); Alert.alert("Atualização pronta","Reiniciar agora para aplicar?",[{text:"Depois"},{text:"Reiniciar",onPress:()=>void Updates.reloadAsync()}]); }
-    catch(e){Alert.alert("Falha na atualização",e instanceof Error?e.message:"Tente novamente.")} finally{setBusy(false)}
+    await checkAndInstallUpdate(setUpdateStage)
   }
   async function refresh(){setRefreshing(true);try{setPending((await syncService.summary()).pending)}finally{setRefreshing(false)}}
   return (
@@ -70,7 +69,7 @@ export default function More() {
       <Text style={common.subtitle}>
         A mesma conta e os mesmos dados do Desktop.
       </Text>
-      <View style={common.card}><Text style={{color:colors.text,fontWeight:"800",fontSize:17}}>Atualização do aplicativo</Text><Text style={[common.muted,{marginTop:8,marginBottom:14}]}>Baixe melhorias sem reinstalar o APK.</Text><Pressable style={common.button} disabled={busy} onPress={()=>void checkUpdate()}><Ionicons name="cloud-download-outline" size={19} color="white"/><Text style={common.buttonText}>Verificar atualização</Text></Pressable></View>
+      <View style={common.card}><Text style={{color:colors.text,fontWeight:"800",fontSize:17}}>Atualização do aplicativo</Text><Text style={[common.muted,{marginTop:8,marginBottom:14}]}>{updateStage==='idle'?'Baixe melhorias sem reinstalar o APK.':updateStageLabel[updateStage]}</Text><Pressable style={[common.button,updateStage!=='idle'&&{opacity:.75}]} disabled={updateStage!=='idle'} onPress={()=>void checkUpdate()}><Ionicons name={updateStage==='ready'?'checkmark-circle-outline':'cloud-download-outline'} size={19} color="white"/><Text style={common.buttonText}>{updateStageLabel[updateStage]}</Text></Pressable></View>
       <View style={common.card}>
         {user ? (
           <>
