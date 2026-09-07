@@ -32,7 +32,7 @@ const info: Record<
     eyebrow: "CUIDADOS",
     title: "Saúde",
     action: "Novo registro",
-    categories: ["Vacina", "Vermífugo", "Medicamento", "Consulta", "Exame"],
+    categories: ["Doença", "Vacina", "Vermífugo", "Medicamento", "Consulta", "Exame"],
   },
   breeding: {
     eyebrow: "PLANEJAMENTO",
@@ -91,6 +91,9 @@ export function ModuleScreen({ module }: { module: MobileModule }) {
     ),
     [form, setForm] = useState(blank(module)),
     [showDate, setShowDate] = useState(false),
+    [diseaseTreatment, setDiseaseTreatment] = useState(""),
+    [diseaseMedications, setDiseaseMedications] = useState(""),
+    [diseaseEvolution, setDiseaseEvolution] = useState(""),
     [refreshing, setRefreshing] = useState(false),
     [error, setError] = useState(""),
     [deleting, setDeleting] = useState<MobileModuleRecord | null>(null);
@@ -110,6 +113,10 @@ export function ModuleScreen({ module }: { module: MobileModule }) {
   const open = (record?: MobileModuleRecord) => {
     setEditing(record ?? null);
     setError("");
+    const diseaseParts = record?.category === "Doença" ? record.description.split("\n") : [];
+    setDiseaseTreatment(diseaseParts.find((line) => line.startsWith("Tratamento: "))?.slice(12) ?? "");
+    setDiseaseMedications(diseaseParts.find((line) => line.startsWith("Medicamentos e doses: "))?.slice(22) ?? "");
+    setDiseaseEvolution(diseaseParts.find((line) => line.startsWith("Evolução: "))?.slice(9) ?? "");
     setForm(
       record
         ? {
@@ -140,7 +147,10 @@ export function ModuleScreen({ module }: { module: MobileModule }) {
       return;
     }
     try {
-      await moduleService.save(form, editing?.id);
+      const diseaseDescription = form.category === "Doença"
+        ? [`Sintomas e ocorrência: ${form.description.replace(/^Sintomas e ocorrência: /, "").split("\n")[0].trim()}`, `Tratamento: ${diseaseTreatment.trim()}`, `Medicamentos e doses: ${diseaseMedications.trim()}`, `Evolução: ${diseaseEvolution.trim()}`].join("\n")
+        : form.description;
+      await moduleService.save({ ...form, description: diseaseDescription }, editing?.id);
       setEditing(undefined);
       await load();
     } catch (e) {
@@ -289,7 +299,7 @@ export function ModuleScreen({ module }: { module: MobileModule }) {
                 {module === "clients"
                   ? "NOME DO CLIENTE"
                   : module === "health"
-                    ? "VACINA / MEDICAMENTO / PROCEDIMENTO"
+                    ? form.category === "Doença" ? "DOENÇA / O QUE ACONTECEU" : "VACINA / MEDICAMENTO / PROCEDIMENTO"
                     : "TÍTULO"}{" "}
                 *
               </Text>
@@ -447,7 +457,18 @@ export function ModuleScreen({ module }: { module: MobileModule }) {
                   />
                 </>
               )}
-              <Text style={common.label}>
+              {module === "health" && form.category === "Doença" ? (
+                <>
+                  <Text style={common.label}>SINTOMAS E O QUE ACONTECEU</Text>
+                  <TextInput style={[common.input,{minHeight:80,textAlignVertical:"top"}]} multiline value={form.description.replace(/^Sintomas e ocorrência: /, "").split("\n")[0]} onChangeText={(description)=>setForm({...form,description})}/>
+                  <Text style={common.label}>COMO FOI TRATADO</Text>
+                  <TextInput style={[common.input,{minHeight:70,textAlignVertical:"top"}]} multiline value={diseaseTreatment} onChangeText={setDiseaseTreatment}/>
+                  <Text style={common.label}>MEDICAMENTOS E DOSES</Text>
+                  <TextInput style={[common.input,{minHeight:70,textAlignVertical:"top"}]} multiline value={diseaseMedications} onChangeText={setDiseaseMedications}/>
+                  <Text style={common.label}>EVOLUÇÃO / RESULTADO</Text>
+                  <TextInput style={[common.input,{minHeight:70,textAlignVertical:"top"}]} multiline value={diseaseEvolution} onChangeText={setDiseaseEvolution}/>
+                </>
+              ) : <><Text style={common.label}>
                 {module === "health"
                   ? "MARCA, LOTE, DOSE, VETERINÁRIO E OBSERVAÇÕES"
                   : "OBSERVAÇÕES"}
@@ -468,7 +489,7 @@ export function ModuleScreen({ module }: { module: MobileModule }) {
                 onChangeText={(description) =>
                   setForm({ ...form, description })
                 }
-              />
+              /></>}
               {error && (
                 <Text
                   style={{

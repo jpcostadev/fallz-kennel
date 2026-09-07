@@ -18,7 +18,11 @@ import {
   dogPhotoService,
   dogService,
   feedingService,
+  moduleService,
+  reminderService,
   type FeedingPlan,
+  type MobileModuleRecord,
+  type Reminder,
   type MobileDog,
   type WeightRecord,
 } from "../src/database";
@@ -64,6 +68,9 @@ export default function Dogs() {
     [query, setQuery] = useState(""),
     [selected, setSelected] = useState<MobileDog | null>(null),
     [selectedPlan, setSelectedPlan] = useState<FeedingPlan | null>(null),
+    [profileRecords, setProfileRecords] = useState<MobileModuleRecord[]>([]),
+    [profileWeights, setProfileWeights] = useState<WeightRecord[]>([]),
+    [profileReminders, setProfileReminders] = useState<Reminder[]>([]),
     [mode, setMode] = useState<Mode>(null),
     [form, setForm] = useState<DogForm>(empty),
     [weights, setWeights] = useState<WeightRecord[]>([]),
@@ -132,7 +139,15 @@ export default function Dogs() {
   };
   const openProfile = async (d: MobileDog) => {
     setSelected(d);
-    setSelectedPlan(await feedingService.find(d.id));
+    const [plan, health, breeding, finance, dogWeights, reminders] = await Promise.all([
+      feedingService.find(d.id), moduleService.list("health"),
+      moduleService.list("breeding"), moduleService.list("finance"),
+      dogService.weights(d.id), reminderService.list(),
+    ]);
+    setSelectedPlan(plan);
+    setProfileRecords([...health, ...breeding, ...finance].filter((record) => record.dogId === d.id));
+    setProfileWeights(dogWeights);
+    setProfileReminders(reminders.filter((reminder) => reminder.dogId === d.id));
     setMode("profile");
   };
   const pickPhoto = async () => {
@@ -509,6 +524,32 @@ export default function Dogs() {
                     ) : (
                       <Text style={common.muted}>Nenhum plano alimentar cadastrado.</Text>
                     )}
+                  </View>
+                  <View style={[common.card, { backgroundColor: "#091b2c" }]}>
+                    <Text style={common.label}>HISTÓRICO DE PESO E BCS</Text>
+                    {profileWeights.length ? profileWeights.map((item) => (
+                      <View key={item.id} style={{ paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.line }}>
+                        <Text style={{ color: colors.text, fontWeight: "800" }}>{(item.weightGrams / 1000).toLocaleString("pt-BR")} kg{item.bodyConditionScore ? ` · BCS ${item.bodyConditionScore}/9` : ""}</Text>
+                        <Text style={common.muted}>{new Date(item.date).toLocaleDateString("pt-BR")}</Text>
+                      </View>
+                    )) : <Text style={common.muted}>Nenhuma pesagem registrada.</Text>}
+                  </View>
+                  {["Doença", "Vacina", "Vermífugo", "Medicamento", "Consulta", "Exame"].map((category) => {
+                    const items = profileRecords.filter((record) => record.module === "health" && record.category.replace(/s$/, "") === category);
+                    if (!items.length) return null;
+                    return <View key={category} style={[common.card, { backgroundColor: "#091b2c" }]}><Text style={common.label}>{category.toUpperCase()}</Text>{items.map((record) => <View key={record.id} style={{ paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.line }}><Text style={{ color: colors.text, fontWeight: "900" }}>{record.title}</Text><Text style={common.muted}>{new Date(`${record.date}T12:00`).toLocaleDateString("pt-BR")}</Text>{record.description ? <Text style={[common.muted, { marginTop: 4 }]}>{record.description}</Text> : null}</View>)}</View>;
+                  })}
+                  <View style={[common.card, { backgroundColor: "#091b2c" }]}>
+                    <Text style={common.label}>REPRODUÇÃO</Text>
+                    {profileRecords.filter((record) => record.module === "breeding").length ? profileRecords.filter((record) => record.module === "breeding").map((record) => <View key={record.id} style={{ paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.line }}><Text style={{ color: colors.text, fontWeight: "900" }}>{record.category} · {record.title}</Text><Text style={common.muted}>{new Date(`${record.date}T12:00`).toLocaleDateString("pt-BR")}{record.description ? ` · ${record.description}` : ""}</Text></View>) : <Text style={common.muted}>Nenhum acompanhamento reprodutivo.</Text>}
+                  </View>
+                  <View style={[common.card, { backgroundColor: "#091b2c" }]}>
+                    <Text style={common.label}>AGENDA E PRÓXIMOS CUIDADOS</Text>
+                    {profileReminders.length ? profileReminders.map((item) => <View key={item.id} style={{ paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.line }}><Text style={{ color: colors.text, fontWeight: "900" }}>{item.title}</Text><Text style={common.muted}>{new Date(item.dateTime).toLocaleString("pt-BR")}</Text></View>) : <Text style={common.muted}>Nenhum lembrete agendado.</Text>}
+                  </View>
+                  <View style={[common.card, { backgroundColor: "#091b2c" }]}>
+                    <Text style={common.label}>FINANCEIRO DO CÃO</Text>
+                    {profileRecords.filter((record) => record.module === "finance").length ? profileRecords.filter((record) => record.module === "finance").map((record) => <View key={record.id} style={{ paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.line }}><Text style={{ color: colors.text, fontWeight: "900" }}>{record.title}</Text><Text style={common.muted}>{record.transactionType === "income" ? "Receita" : "Despesa"} · R$ {(record.amount ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} · {new Date(`${record.date}T12:00`).toLocaleDateString("pt-BR")}</Text></View>) : <Text style={common.muted}>Nenhum lançamento financeiro vinculado.</Text>}
                   </View>
                   <View style={[common.row, { flexWrap: "nowrap" }]}>
                     <Pressable

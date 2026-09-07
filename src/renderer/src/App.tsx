@@ -117,6 +117,7 @@ const pageInfo: Record<
       { title: "Vacinas", text: "Aplicações e próximas doses" },
       { title: "Vermífugos", text: "Controle de aplicações" },
       { title: "Medicamentos", text: "Tratamentos em andamento" },
+      { title: "Doenças", text: "Ocorrências, sintomas, tratamentos e evolução" },
       { title: "Veterinário", text: "Consultas, exames e retornos" },
     ],
   },
@@ -1745,19 +1746,19 @@ function RecordDialog({
             {page === "health" && (
               <>
                 <label>
-                  <span>Próxima aplicação/retorno</span>
+                  <span>{watch("category") === "Doenças" ? "Data de retorno" : "Próxima aplicação/retorno"}</span>
                   <input type="date" {...register("nextDate")} />
                 </label>
                 <label>
-                  <span>Fabricante</span>
+                  <span>{watch("category") === "Doenças" ? "Medicamentos administrados" : "Fabricante"}</span>
                   <input {...register("manufacturer")} />
                 </label>
                 <label>
-                  <span>Lote</span>
+                  <span>{watch("category") === "Doenças" ? "Tratamento realizado" : "Lote"}</span>
                   <input {...register("batch")} />
                 </label>
                 <label>
-                  <span>Dose</span>
+                  <span>{watch("category") === "Doenças" ? "Doses e frequência" : "Dose"}</span>
                   <input {...register("dose")} />
                 </label>
                 <label>
@@ -1848,7 +1849,7 @@ function RecordDialog({
               </>
             )}
             <label className="full">
-              <span>Observações</span>
+              <span>{page === "health" && watch("category") === "Doenças" ? "Sintomas, o que aconteceu e evolução" : "Observações"}</span>
               <textarea
                 {...register("description")}
                 placeholder="Informações complementares"
@@ -2491,6 +2492,7 @@ function DogProfileDialog({
     "Acompanhamento",
     "Alimentação",
     "Saúde",
+    "Doenças",
     "Vacinas",
     "Vermífugos",
     "Medicamentos",
@@ -2521,12 +2523,14 @@ function DogProfileDialog({
   const tabRecords = records.filter((record) =>
     tab === "Saúde"
       ? record.module === "health"
+      : tab === "Doenças"
+        ? record.category === "Doença" || record.category === "Doenças"
       : tab === "Vacinas"
-        ? record.category === "Vacinas"
+        ? record.category === "Vacina" || record.category === "Vacinas"
         : tab === "Vermífugos"
-          ? record.category === "Vermífugos"
+          ? record.category === "Vermífugo" || record.category === "Vermífugos"
           : tab === "Medicamentos"
-            ? record.category === "Medicamentos"
+            ? record.category === "Medicamento" || record.category === "Medicamentos"
             : tab === "Reprodução"
               ? record.module === "breeding"
               : tab === "Financeiro"
@@ -2535,6 +2539,7 @@ function DogProfileDialog({
   );
   const dataTabs = [
     "Saúde",
+    "Doenças",
     "Vacinas",
     "Vermífugos",
     "Medicamentos",
@@ -2638,6 +2643,10 @@ function DogProfileDialog({
                         {record.nextDate
                           ? ` • Próxima ${record.nextDate.split("-").reverse().join("/")}`
                           : ""}
+                        {record.manufacturer ? ` • Medicamento/fabricante: ${record.manufacturer}` : ""}
+                        {record.batch ? ` • Tratamento/lote: ${record.batch}` : ""}
+                        {record.veterinarian ? ` • Veterinário: ${record.veterinarian}` : ""}
+                        {record.clinic ? ` • Clínica: ${record.clinic}` : ""}
                         {record.description ? ` • ${record.description}` : ""}
                       </span>
                     </div>
