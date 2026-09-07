@@ -1118,6 +1118,7 @@ export const syncService = {
         const p = event.payload;
         if ((event.entityType === "dog_measurements" || event.entityType === "feeding_plans") &&
           !(await transaction.getFirstAsync("SELECT 1 FROM dogs WHERE id=?", String(p.dogId)))) continue;
+        try {
         if (event.entityType === "dogs") {
           await transaction.runAsync(
             `INSERT INTO dogs(id,name,birth_date,weight_kg,breed,sex,registered_name,color,status,notes,created_at,updated_at,deleted_at,version,device_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,birth_date=excluded.birth_date,breed=excluded.breed,sex=excluded.sex,registered_name=excluded.registered_name,color=excluded.color,status=excluded.status,notes=excluded.notes,updated_at=excluded.updated_at,deleted_at=excluded.deleted_at,version=excluded.version,device_id=excluded.device_id WHERE excluded.version>dogs.version OR (excluded.version=dogs.version AND excluded.updated_at>dogs.updated_at)`,
@@ -1209,6 +1210,10 @@ export const syncService = {
             Number(p.version),
             String(p.deviceId),
           );
+        }
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : String(error);
+          throw new Error(`Evento ${event.entityType}/${event.entityId}: ${reason}`);
         }
         await transaction.runAsync(
           "INSERT INTO sync_applied_events(event_id,applied_at) VALUES(?,?)",

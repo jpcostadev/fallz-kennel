@@ -16,6 +16,7 @@ export async function importAgendaEvents(
       dateTime = `${String(p.date)}T${time ? `${time[1]}:${time[2]}` : "09:00"}:00`;
     const dogId = p.dogId ? String(p.dogId) : null;
     if (dogId && !(await db.getFirstAsync("SELECT 1 FROM dogs WHERE id=?", dogId))) continue;
+    try {
     await db.withExclusiveTransactionAsync(async (transaction) => {
       await transaction.runAsync(
         "INSERT OR IGNORE INTO reminders(id,dog_id,title,date_time,type,notification_id,created_at) VALUES(?,?,?,?,?,?,?)",
@@ -33,6 +34,10 @@ export async function importAgendaEvents(
         new Date().toISOString(),
       );
     });
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new Error(`Evento agenda/${event.entityId}: ${reason}`);
+    }
     count++;
   }
   return count;

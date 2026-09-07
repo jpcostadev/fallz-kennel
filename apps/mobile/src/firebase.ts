@@ -57,7 +57,14 @@ export async function registerPushDevice(): Promise<void> {
     updatedAt: new Date().toISOString(),
   });
 }
-export async function synchronize() {
+type SynchronizationResult = {
+  uploaded: number;
+  downloaded: number;
+  summary: Awaited<ReturnType<typeof syncService.summary>>;
+};
+let activeSynchronization: Promise<SynchronizationResult> | null = null;
+
+async function performSynchronization(): Promise<SynchronizationResult> {
   const user = auth.currentUser;
   if (!user) throw new Error("Entre na conta Firebase.");
   const pending = await syncService.pending();
@@ -95,4 +102,12 @@ export async function synchronize() {
     downloaded,
     summary: await syncService.summary(),
   };
+}
+
+export function synchronize(): Promise<SynchronizationResult> {
+  if (activeSynchronization) return activeSynchronization;
+  activeSynchronization = performSynchronization().finally(() => {
+    activeSynchronization = null;
+  });
+  return activeSynchronization;
 }
