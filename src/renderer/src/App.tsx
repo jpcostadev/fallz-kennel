@@ -77,6 +77,7 @@ import {
   synchronizeFirebase,
 } from "./firebase";
 import type { SyncSummary } from "../../shared/sync";
+import type { FeedingPlanRecord } from "../../shared/feeding";
 import {
   veterinaryTopics,
   type VetTopic,
@@ -943,7 +944,10 @@ function DogsPage({
 }
 
 function FeedingPage({ dogs }: { dogs: Dog[] }): React.JSX.Element {
+  const dialog = useUiDialog();
   const [dogId, setDogId] = useState<string | null>(null),
+    [plans, setPlans] = useState<FeedingPlanRecord[]>([]),
+    [showForm, setShowForm] = useState(false),
     [weight, setWeight] = useState(0),
     [food, setFood] = useState(""),
     [kcal, setKcal] = useState(3800),
@@ -952,6 +956,10 @@ function FeedingPage({ dogs }: { dogs: Dog[] }): React.JSX.Element {
     [stage, setStage] = useState<LifeStage>("adult-intact"),
     [goal, setGoal] = useState<WeightGoal>("maintain"),
     [message, setMessage] = useState("");
+  async function refreshPlans(): Promise<void> {
+    setPlans(await window.fallz.feeding.list());
+  }
+  useEffect(() => { void refreshPlans(); }, []);
   useEffect(() => {
     if (!dogId) {
       setWeight(0);
@@ -1012,7 +1020,20 @@ function FeedingPage({ dogs }: { dogs: Dog[] }): React.JSX.Element {
       goal,
       adjustmentPercent: 0,
     });
+    await refreshPlans();
     setMessage("Plano salvo e pronto para sincronizar com o mobile.");
+    setShowForm(false);
+  }
+  function editFeeding(saved: FeedingPlanRecord): void {
+    setDogId(saved.dogId); setFood(saved.foodName); setKcal(saved.kcalPerKg);
+    setMeals(saved.mealsPerDay); setTimes(saved.times.join(", "));
+    setStage(saved.lifeStage); setGoal(saved.goal); setShowForm(true); setMessage("");
+  }
+  async function removeFeeding(saved: FeedingPlanRecord): Promise<void> {
+    const linkedDog = dogs.find((dog) => dog.id === saved.dogId);
+    if (!(await dialog.confirm({ title: "Excluir plano alimentar?", message: `O plano de ${linkedDog?.name ?? "este cão"} será removido e a exclusão será sincronizada.`, confirmLabel: "Excluir plano", tone: "danger" }))) return;
+    await window.fallz.feeding.remove(saved.id);
+    await refreshPlans();
   }
   return (
     <>
@@ -1022,7 +1043,15 @@ function FeedingPage({ dogs }: { dogs: Dog[] }): React.JSX.Element {
           <h1>Alimentação</h1>
           <p>Calcule porções pelo peso, energia da ração e fase de vida.</p>
         </div>
+        <button className="primary-button" onClick={() => { setDogId(null); setFood(""); setShowForm(true); }}><Plus /> Criar plano</button>
       </section>
+      {!showForm && (
+        <section className="panel settings-panel">
+          <div className="settings-title"><div className="module-card-icon"><Utensils /></div><div><h2>Planos alimentares</h2><p>{plans.length} plano(s) cadastrado(s)</p></div></div>
+          {plans.length === 0 ? <div className="empty-state"><strong>Nenhum plano cadastrado</strong><span>Use “Criar plano” para vincular um plano a um cão.</span></div> : <div className="profile-records">{plans.map((saved) => { const linkedDog = dogs.find((dog) => dog.id === saved.dogId); return <div key={saved.id}><div className={`profile-avatar ${linkedDog?.sex ?? "male"}`}>{linkedDog?.name[0]?.toUpperCase() ?? "?"}</div><div><strong>{linkedDog?.name ?? "Cão não encontrado"} · {saved.foodName}</strong><span>{saved.gramsPerMeal} g/refeição · {saved.mealsPerDay}× ao dia · {saved.dailyGrams} g/dia · {saved.times.join(" · ")}</span></div><div className="record-actions"><button className="icon-button" onClick={() => editFeeding(saved)} aria-label="Editar plano"><Pencil /></button><button className="icon-button danger" onClick={() => void removeFeeding(saved)} aria-label="Excluir plano"><Trash2 /></button></div></div>})}</div>}
+        </section>
+      )}
+      {showForm && (
       <section className="panel settings-panel">
         <div className="settings-title">
           <div className="module-card-icon">
@@ -1126,12 +1155,14 @@ function FeedingPage({ dogs }: { dogs: Dog[] }): React.JSX.Element {
           </div>
         )}
         <div className="modal-actions">
+          <button className="secondary-button" onClick={() => setShowForm(false)}>Cancelar</button>
           {message && <span className="success-message">{message}</span>}
           <button className="primary-button" onClick={() => void save()}>
             <Save /> Salvar plano
           </button>
         </div>
       </section>
+      )}
     </>
   );
 }
@@ -2458,6 +2489,7 @@ function DogProfileDialog({
   const tabs = [
     "Resumo",
     "Acompanhamento",
+    "Alimentação",
     "Saúde",
     "Vacinas",
     "Vermífugos",
@@ -2472,6 +2504,7 @@ function DogProfileDialog({
   const [tab, setTab] = useState<(typeof tabs)[number]>("Resumo");
   const [records, setRecords] = useState<ModuleRecord[]>([]);
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
+  const [feedingPlan, setFeedingPlan] = useState<FeedingPlanRecord | null>(null);
   const [editingMeasurement, setEditingMeasurement] = useState<
     Measurement | null | undefined
   >(undefined);
@@ -2482,6 +2515,7 @@ function DogProfileDialog({
     void Promise.all([
       window.fallz.records.listByDog(dog.id).then(setRecords),
       window.fallz.measurements.list(dog.id).then(setMeasurements),
+      window.fallz.feeding.list().then((plans) => setFeedingPlan(plans.find((plan) => plan.dogId === dog.id) ?? null)),
     ]);
   }, [dog.id]);
   const tabRecords = records.filter((record) =>
@@ -2562,6 +2596,8 @@ function DogProfileDialog({
                 <strong>{dog.notes || "Nenhuma observação cadastrada."}</strong>
               </div>
             </div>
+          ) : tab === "Alimentação" ? (
+            feedingPlan ? <div className="profile-summary"><div><span>Ração</span><strong>{feedingPlan.foodName}</strong></div><div><span>Energia</span><strong>{feedingPlan.kcalPerKg} kcal/kg</strong></div><div><span>Porção</span><strong>{feedingPlan.gramsPerMeal} g por refeição</strong></div><div><span>Total diário</span><strong>{feedingPlan.dailyGrams} g/dia</strong></div><div><span>Refeições</span><strong>{feedingPlan.mealsPerDay}× ao dia</strong></div><div><span>Horários</span><strong>{feedingPlan.times.join(" · ")}</strong></div></div> : <div className="empty-state"><strong>Nenhum plano alimentar</strong><span>Crie um plano na tela Alimentação para vinculá-lo a este cão.</span></div>
           ) : tab === "Acompanhamento" ? (
             <GrowthPanel
               dog={dog}

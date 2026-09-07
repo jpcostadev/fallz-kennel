@@ -17,6 +17,8 @@ import { Ionicons } from "@expo/vector-icons";
 import {
   dogPhotoService,
   dogService,
+  feedingService,
+  type FeedingPlan,
   type MobileDog,
   type WeightRecord,
 } from "../src/database";
@@ -61,6 +63,7 @@ export default function Dogs() {
     [photos, setPhotos] = useState<Record<string, string>>({}),
     [query, setQuery] = useState(""),
     [selected, setSelected] = useState<MobileDog | null>(null),
+    [selectedPlan, setSelectedPlan] = useState<FeedingPlan | null>(null),
     [mode, setMode] = useState<Mode>(null),
     [form, setForm] = useState<DogForm>(empty),
     [weights, setWeights] = useState<WeightRecord[]>([]),
@@ -126,6 +129,11 @@ export default function Dogs() {
     setSelected(d);
     setWeights(await dogService.weights(d.id));
     setMode("tracking");
+  };
+  const openProfile = async (d: MobileDog) => {
+    setSelected(d);
+    setSelectedPlan(await feedingService.find(d.id));
+    setMode("profile");
   };
   const pickPhoto = async () => {
     if (!selected) return;
@@ -276,10 +284,7 @@ export default function Dogs() {
           <Pressable
             key={d.id}
             style={common.card}
-            onPress={() => {
-              setSelected(d);
-              setMode("profile");
-            }}
+            onPress={() => void openProfile(d)}
           >
             <View
               style={{ flexDirection: "row", alignItems: "center", gap: 13 }}
@@ -489,6 +494,21 @@ export default function Dogs() {
                         {selected.notes}
                       </Text>
                     ) : null}
+                  </View>
+                  <View style={[common.card, { backgroundColor: "#091b2c" }]}>
+                    <Text style={common.label}>PLANO DE ALIMENTAÇÃO</Text>
+                    {selectedPlan ? (
+                      <>
+                        <Text style={common.value}>{selectedPlan.foodName}</Text>
+                        <Text style={[common.muted, { marginTop: 8 }]}>
+                          {selectedPlan.gramsPerMeal} g por refeição · {selectedPlan.mealsPerDay}× ao dia
+                        </Text>
+                        <Text style={common.muted}>{selectedPlan.dailyGrams} g/dia · {selectedPlan.kcalPerKg} kcal/kg</Text>
+                        <Text style={common.muted}>Horários: {selectedPlan.times.join(" · ")}</Text>
+                      </>
+                    ) : (
+                      <Text style={common.muted}>Nenhum plano alimentar cadastrado.</Text>
+                    )}
                   </View>
                   <View style={[common.row, { flexWrap: "nowrap" }]}>
                     <Pressable

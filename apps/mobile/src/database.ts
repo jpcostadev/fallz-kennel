@@ -592,6 +592,24 @@ export const dogPhotoService = {
 };
 
 export const feedingService = {
+  async list(): Promise<FeedingPlan[]> {
+    const rows = await (await getDatabase()).getAllAsync<{
+      id: string; dog_id: string; food_name: string; kcal_per_kg: number;
+      daily_grams: number; grams_per_meal: number; meals_per_day: number;
+      times_json: string; life_stage: LifeStage; goal: WeightGoal;
+      adjustment_percent: number; created_at: string; updated_at: string;
+      deleted_at: string | null; version: number; device_id: string;
+    }>("SELECT * FROM feeding_plans WHERE deleted_at IS NULL ORDER BY updated_at DESC");
+    return rows.map((r) => ({
+      id: r.id, dogId: r.dog_id, foodName: r.food_name,
+      kcalPerKg: r.kcal_per_kg, dailyGrams: r.daily_grams,
+      gramsPerMeal: r.grams_per_meal, mealsPerDay: r.meals_per_day,
+      times: JSON.parse(r.times_json) as string[], lifeStage: r.life_stage,
+      goal: r.goal, adjustmentPercent: r.adjustment_percent,
+      createdAt: r.created_at, updatedAt: r.updated_at,
+      deletedAt: r.deleted_at, version: r.version, deviceId: r.device_id,
+    }));
+  },
   async save(
     input: Omit<
       FeedingPlan,
@@ -687,6 +705,31 @@ export const feedingService = {
           deviceId: r.device_id,
         }
       : null;
+  },
+  async remove(id: string): Promise<void> {
+    const db = await getDatabase();
+    const current = await db.getFirstAsync<{
+      id: string; dog_id: string; food_name: string; kcal_per_kg: number;
+      daily_grams: number; grams_per_meal: number; meals_per_day: number;
+      times_json: string; life_stage: LifeStage; goal: WeightGoal;
+      adjustment_percent: number; created_at: string; updated_at: string;
+      version: number; device_id: string;
+    }>("SELECT * FROM feeding_plans WHERE id=? AND deleted_at IS NULL", id);
+    if (!current) throw new Error("Plano não encontrado.");
+    const now = new Date().toISOString();
+    const record: FeedingPlan = {
+      id: current.id, dogId: current.dog_id, foodName: current.food_name,
+      kcalPerKg: current.kcal_per_kg, dailyGrams: current.daily_grams,
+      gramsPerMeal: current.grams_per_meal, mealsPerDay: current.meals_per_day,
+      times: JSON.parse(current.times_json) as string[], lifeStage: current.life_stage,
+      goal: current.goal, adjustmentPercent: current.adjustment_percent,
+      createdAt: current.created_at, updatedAt: now, deletedAt: now,
+      version: current.version + 1, deviceId: current.device_id,
+    };
+    await db.withTransactionAsync(async () => {
+      await db.runAsync("UPDATE feeding_plans SET deleted_at=?,updated_at=?,version=? WHERE id=?", now, now, record.version, id);
+      await queue(db, "feeding_plans", id, "delete", { ...record });
+    });
   },
 };
 
