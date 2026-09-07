@@ -1,6 +1,6 @@
 {
   "name": "fallz-kennel",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "private": true,
   "description": "Gestão offline-first para o Fallz Kennel",
   "main": "out/main/index.js",

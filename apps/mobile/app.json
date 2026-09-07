@@ -2,13 +2,15 @@
   "expo": {
     "name": "Fallz Kennel",
     "slug": "fallz-kennel",
-    "version": "0.4.0",
+    "version": "0.5.0",
     "orientation": "portrait",
     "icon": "../../fallz-kennel.png",
     "scheme": "fallzkennel",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
-    "runtimeVersion": { "policy": "appVersion" },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "updates": {
       "url": "https://u.expo.dev/bb1b1c03-b180-492f-92fa-26f0bbb74936",
       "checkAutomatically": "ON_LOAD",
@@ -17,7 +19,7 @@
     "android": {
       "package": "com.fallzkennel.mobile",
       "googleServicesFile": "../../google-services.json",
-      "versionCode": 4,
+      "versionCode": 5,
       "permissions": [
         "SCHEDULE_EXACT_ALARM",
         "RECEIVE_BOOT_COMPLETED",
@@ -33,7 +35,8 @@
       "expo-sqlite",
       "expo-notifications",
       "expo-updates",
-      "expo-status-bar"
+      "expo-status-bar",
+      "expo-background-task"
     ],
     "experiments": {
       "typedRoutes": true

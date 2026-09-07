@@ -1,9 +1,11 @@
-import { useState } from 'react'
-import { Modal, Pressable, Text, View } from 'react-native'
+import { useEffect, useState } from 'react'
+import { AppState, Modal, Pressable, Text, View } from 'react-native'
 import { Tabs, useRouter } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../src/theme'
+import { synchronize } from '../src/firebase'
+import { registerBackgroundDatabaseSync } from '../src/background-sync'
 
 type IconName = React.ComponentProps<typeof Ionicons>['name']
 const tabIcon = (name: IconName) => ({ color, size }: { color: unknown; size: number }) => <Ionicons name={name} color={color as string} size={size} />
@@ -17,6 +19,14 @@ export default function Layout() {
     ['restaurant','Plano de alimentação',()=>go('/feeding')], ['notifications','Criar lembrete',()=>go('/agenda')],
     ['cloud-done','Sincronização Firebase',()=>go('/more')], ['settings','Configurações',()=>go('/settings')]
   ]
+  useEffect(()=>{
+    const run=()=>void synchronize().catch(()=>undefined)
+    run()
+    const timer=setInterval(run,10*60*1000)
+    const subscription=AppState.addEventListener('change',(state)=>{if(state==='active')run()})
+    void registerBackgroundDatabaseSync()
+    return()=>{clearInterval(timer);subscription.remove()}
+  },[])
   return <>
     <StatusBar style="light" />
     <Tabs screenOptions={{ headerShown:false, tabBarActiveTintColor:colors.blue, tabBarInactiveTintColor:colors.muted, tabBarStyle:{ backgroundColor:'#08101a',borderTopColor:colors.line,height:72,paddingBottom:10,paddingTop:6 }, tabBarLabelStyle:{ fontWeight:'700',fontSize:10 } }}>

@@ -52,6 +52,20 @@ function App(): React.JSX.Element {
 
   useEffect(() => { void refresh() }, [])
   useEffect(() => {
+    let authenticated = false
+    let syncing = false
+    const syncDatabase = async (): Promise<void> => {
+      if (!authenticated || syncing || !navigator.onLine) return
+      syncing = true
+      try { await synchronizeFirebase(); await refresh() } catch { /* tenta novamente no próximo ciclo */ } finally { syncing = false }
+    }
+    const stopAuth = observeFirebaseUser((user) => { authenticated = Boolean(user); if (user) void syncDatabase() })
+    const online = (): void => { void syncDatabase() }
+    window.addEventListener('online', online)
+    const timer = window.setInterval(() => void syncDatabase(), 10 * 60 * 1000)
+    return () => { stopAuth(); window.removeEventListener('online', online); window.clearInterval(timer) }
+  }, [])
+  useEffect(() => {
     void Promise.all((['health', 'breeding', 'clients', 'finance', 'agenda'] as OperationalModule[]).map((module) => window.fallz.records.list(module))).then((groups) => setSearchRecords(groups.flat()))
   }, [])
   useEffect(() => {
