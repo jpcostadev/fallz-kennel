@@ -2,7 +2,7 @@
   "expo": {
     "name": "Fallz Kennel",
     "slug": "fallz-kennel",
-    "version": "0.6.0",
+    "version": "0.7.0",
     "orientation": "portrait",
     "icon": "../../fallz-kennel.png",
     "scheme": "fallzkennel",
@@ -19,7 +19,7 @@
     "android": {
       "package": "com.fallzkennel.mobile",
       "googleServicesFile": "../../google-services.json",
-      "versionCode": 6,
+      "versionCode": 7,
       "permissions": [
         "SCHEDULE_EXACT_ALARM",
         "RECEIVE_BOOT_COMPLETED",

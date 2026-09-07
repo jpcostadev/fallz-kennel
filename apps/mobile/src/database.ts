@@ -54,8 +54,28 @@ export interface WeightRecord {
   version: number;
   deviceId: string;
 }
-export type MobileModule = 'health'|'breeding'|'clients'|'finance'
-export interface MobileModuleRecord { id:string;module:MobileModule;title:string;category:string;date:string;description:string;amount:number|null;dogId:string|null;phone:string;whatsapp:string;email:string;transactionType:'income'|'expense'|null;quantity:number|null;unit:string;createdAt:string;updatedAt:string;deletedAt:string|null;version:number;deviceId:string }
+export type MobileModule = "health" | "breeding" | "clients" | "finance";
+export interface MobileModuleRecord {
+  id: string;
+  module: MobileModule;
+  title: string;
+  category: string;
+  date: string;
+  description: string;
+  amount: number | null;
+  dogId: string | null;
+  phone: string;
+  whatsapp: string;
+  email: string;
+  transactionType: "income" | "expense" | null;
+  quantity: number | null;
+  unit: string;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+  version: number;
+  deviceId: string;
+}
 export type CloudEntity =
   "dogs" | "dog_measurements" | "agenda" | "feeding_plans" | "module_records";
 export interface CloudEvent {
@@ -116,9 +136,11 @@ async function queue(
   );
 }
 const days = (birth: string, date: string) => {
-  const start=Date.parse(`${birth}T12:00:00Z`), end=Date.parse(`${date}T12:00:00Z`)
-  if(Number.isNaN(start)||Number.isNaN(end)) throw new Error('Selecione uma data válida.')
-  return Math.max(0,Math.floor((end-start)/86400000))
+  const start = Date.parse(`${birth}T12:00:00Z`),
+    end = Date.parse(`${date}T12:00:00Z`);
+  if (Number.isNaN(start) || Number.isNaN(end))
+    throw new Error("Selecione uma data válida.");
+  return Math.max(0, Math.floor((end - start) / 86400000));
 };
 
 export const dogService = {
@@ -514,6 +536,40 @@ export const dogService = {
   },
 };
 
+export const dogPhotoService = {
+  async list(): Promise<Record<string, string>> {
+    const rows = await (
+      await getDatabase()
+    ).getAllAsync<{ key: string; value: string }>(
+      "SELECT key,value FROM app_settings WHERE key LIKE 'dog_photo_%'",
+    );
+    return Object.fromEntries(
+      rows.map((row) => [row.key.slice(10), row.value]),
+    );
+  },
+  async save(dogId: string, uri: string) {
+    await (
+      await getDatabase()
+    ).runAsync(
+      "INSERT INTO app_settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+      `dog_photo_${dogId}`,
+      uri,
+    );
+  },
+  async get(dogId: string) {
+    return (
+      (
+        await (
+          await getDatabase()
+        ).getFirstAsync<{ value: string }>(
+          "SELECT value FROM app_settings WHERE key=?",
+          `dog_photo_${dogId}`,
+        )
+      )?.value ?? null
+    );
+  },
+};
+
 export const feedingService = {
   async save(
     input: Omit<
@@ -560,13 +616,9 @@ export const feedingService = {
         record.version,
         deviceId,
       );
-      await queue(
-        db,
-        "feeding_plans",
-        record.id,
-        old ? "update" : "create",
-        { ...record },
-      );
+      await queue(db, "feeding_plans", record.id, old ? "update" : "create", {
+        ...record,
+      });
     });
     return record;
   },
@@ -618,8 +670,111 @@ export const feedingService = {
 };
 
 export const reminderService = {
-  async update(id:string,input:Omit<Reminder,"id">){const db=await getDatabase(),now=new Date().toISOString(),deviceId=await getDeviceId(),old=await db.getFirstAsync<{created_at:string}>("SELECT created_at FROM reminders WHERE id=?",id);if(!old)throw new Error("Lembrete não encontrado.");const record={...input,id},cloud={id,module:"agenda",title:input.title,category:input.type==="appointment"?"Consulta":"Lembrete",date:input.dateTime.slice(0,10),description:`Horário: ${new Date(input.dateTime).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}`,amount:null,dogId:input.dogId,nextDate:"",phone:"",whatsapp:"",instagram:"",email:"",city:"",state:"",cpf:"",transactionType:null,quantity:null,unit:"",supplier:"",manufacturer:"",batch:"",dose:"",veterinarian:"",clinic:"",createdAt:old.created_at,updatedAt:now,deletedAt:null,version:2,deviceId};await db.withTransactionAsync(async()=>{await db.runAsync("UPDATE reminders SET dog_id=?,title=?,date_time=?,type=?,notification_id=? WHERE id=?",input.dogId,input.title,input.dateTime,input.type,input.notificationId,id);await queue(db,"agenda",id,"update",cloud)});return record},
-  async remove(id:string){const db=await getDatabase(),now=new Date().toISOString(),deviceId=await getDeviceId(),old=await db.getFirstAsync<{dog_id:string|null;title:string;date_time:string;type:string;created_at:string}>("SELECT * FROM reminders WHERE id=?",id);if(!old)throw new Error("Lembrete não encontrado.");const cloud={id,module:"agenda",title:old.title,category:"Lembrete",date:old.date_time.slice(0,10),description:"",amount:null,dogId:old.dog_id,nextDate:"",phone:"",whatsapp:"",instagram:"",email:"",city:"",state:"",cpf:"",transactionType:null,quantity:null,unit:"",supplier:"",manufacturer:"",batch:"",dose:"",veterinarian:"",clinic:"",createdAt:old.created_at,updatedAt:now,deletedAt:now,version:2,deviceId};await db.withTransactionAsync(async()=>{await db.runAsync("DELETE FROM reminders WHERE id=?",id);await queue(db,"agenda",id,"delete",cloud)})},
+  async update(id: string, input: Omit<Reminder, "id">) {
+    const db = await getDatabase(),
+      now = new Date().toISOString(),
+      deviceId = await getDeviceId(),
+      old = await db.getFirstAsync<{ created_at: string }>(
+        "SELECT created_at FROM reminders WHERE id=?",
+        id,
+      );
+    if (!old) throw new Error("Lembrete não encontrado.");
+    const record = { ...input, id },
+      cloud = {
+        id,
+        module: "agenda",
+        title: input.title,
+        category: input.type === "appointment" ? "Consulta" : "Lembrete",
+        date: input.dateTime.slice(0, 10),
+        description: `Horário: ${new Date(input.dateTime).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`,
+        amount: null,
+        dogId: input.dogId,
+        nextDate: "",
+        phone: "",
+        whatsapp: "",
+        instagram: "",
+        email: "",
+        city: "",
+        state: "",
+        cpf: "",
+        transactionType: null,
+        quantity: null,
+        unit: "",
+        supplier: "",
+        manufacturer: "",
+        batch: "",
+        dose: "",
+        veterinarian: "",
+        clinic: "",
+        createdAt: old.created_at,
+        updatedAt: now,
+        deletedAt: null,
+        version: 2,
+        deviceId,
+      };
+    await db.withTransactionAsync(async () => {
+      await db.runAsync(
+        "UPDATE reminders SET dog_id=?,title=?,date_time=?,type=?,notification_id=? WHERE id=?",
+        input.dogId,
+        input.title,
+        input.dateTime,
+        input.type,
+        input.notificationId,
+        id,
+      );
+      await queue(db, "agenda", id, "update", cloud);
+    });
+    return record;
+  },
+  async remove(id: string) {
+    const db = await getDatabase(),
+      now = new Date().toISOString(),
+      deviceId = await getDeviceId(),
+      old = await db.getFirstAsync<{
+        dog_id: string | null;
+        title: string;
+        date_time: string;
+        type: string;
+        created_at: string;
+      }>("SELECT * FROM reminders WHERE id=?", id);
+    if (!old) throw new Error("Lembrete não encontrado.");
+    const cloud = {
+      id,
+      module: "agenda",
+      title: old.title,
+      category: "Lembrete",
+      date: old.date_time.slice(0, 10),
+      description: "",
+      amount: null,
+      dogId: old.dog_id,
+      nextDate: "",
+      phone: "",
+      whatsapp: "",
+      instagram: "",
+      email: "",
+      city: "",
+      state: "",
+      cpf: "",
+      transactionType: null,
+      quantity: null,
+      unit: "",
+      supplier: "",
+      manufacturer: "",
+      batch: "",
+      dose: "",
+      veterinarian: "",
+      clinic: "",
+      createdAt: old.created_at,
+      updatedAt: now,
+      deletedAt: now,
+      version: 2,
+      deviceId,
+    };
+    await db.withTransactionAsync(async () => {
+      await db.runAsync("DELETE FROM reminders WHERE id=?", id);
+      await queue(db, "agenda", id, "delete", cloud);
+    });
+  },
   async create(input: Omit<Reminder, "id">) {
     const db = await getDatabase(),
       now = new Date().toISOString(),
@@ -696,10 +851,134 @@ export const reminderService = {
 };
 
 export const moduleService = {
-  async list(module:MobileModule):Promise<MobileModuleRecord[]>{const rows=await (await getDatabase()).getAllAsync<any>('SELECT * FROM module_records WHERE module=? AND deleted_at IS NULL ORDER BY date DESC,updated_at DESC',module);return rows.map((r:any)=>({id:r.id,module:r.module,title:r.title,category:r.category,date:r.date,description:r.description,amount:r.amount,dogId:r.dog_id,phone:r.phone,whatsapp:r.whatsapp,email:r.email,transactionType:r.transaction_type,quantity:r.quantity,unit:r.unit,createdAt:r.created_at,updatedAt:r.updated_at,deletedAt:r.deleted_at,version:r.version,deviceId:r.device_id}))},
-  async save(input:Omit<MobileModuleRecord,'id'|'createdAt'|'updatedAt'|'deletedAt'|'version'|'deviceId'>,id?:string){const db=await getDatabase(),now=new Date().toISOString(),deviceId=await getDeviceId();const previous=id?await db.getFirstAsync<{created_at:string;version:number}>('SELECT created_at,version FROM module_records WHERE id=?',id):null;const record:MobileModuleRecord={...input,id:id??uuid(),createdAt:previous?.created_at??now,updatedAt:now,deletedAt:null,version:(previous?.version??0)+1,deviceId};await db.withTransactionAsync(async()=>{await db.runAsync(`INSERT INTO module_records(id,module,title,category,date,description,amount,dog_id,phone,whatsapp,email,transaction_type,quantity,unit,created_at,updated_at,deleted_at,version,device_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET module=excluded.module,title=excluded.title,category=excluded.category,date=excluded.date,description=excluded.description,amount=excluded.amount,dog_id=excluded.dog_id,phone=excluded.phone,whatsapp=excluded.whatsapp,email=excluded.email,transaction_type=excluded.transaction_type,quantity=excluded.quantity,unit=excluded.unit,updated_at=excluded.updated_at,deleted_at=NULL,version=excluded.version,device_id=excluded.device_id`,record.id,record.module,record.title,record.category,record.date,record.description,record.amount,record.dogId,record.phone,record.whatsapp,record.email,record.transactionType,record.quantity,record.unit,record.createdAt,record.updatedAt,null,record.version,record.deviceId);await queue(db,'module_records',record.id,previous?'update':'create',{...record})});return record},
-  async remove(id:string){const db=await getDatabase(),row=await db.getFirstAsync<any>('SELECT * FROM module_records WHERE id=? AND deleted_at IS NULL',id);if(!row)return;const now=new Date().toISOString(),record={id:row.id,module:row.module,title:row.title,category:row.category,date:row.date,description:row.description,amount:row.amount,dogId:row.dog_id,phone:row.phone,whatsapp:row.whatsapp,email:row.email,transactionType:row.transaction_type,quantity:row.quantity,unit:row.unit,createdAt:row.created_at,updatedAt:now,deletedAt:now,version:row.version+1,deviceId:row.device_id};await db.withTransactionAsync(async()=>{await db.runAsync('UPDATE module_records SET deleted_at=?,updated_at=?,version=? WHERE id=?',now,now,record.version,id);await queue(db,'module_records',id,'delete',record)})}
-}
+  async list(module: MobileModule): Promise<MobileModuleRecord[]> {
+    const rows = await (
+      await getDatabase()
+    ).getAllAsync<any>(
+      "SELECT * FROM module_records WHERE module=? AND deleted_at IS NULL ORDER BY date DESC,updated_at DESC",
+      module,
+    );
+    return rows.map((r: any) => ({
+      id: r.id,
+      module: r.module,
+      title: r.title,
+      category: r.category,
+      date: r.date,
+      description: r.description,
+      amount: r.amount,
+      dogId: r.dog_id,
+      phone: r.phone,
+      whatsapp: r.whatsapp,
+      email: r.email,
+      transactionType: r.transaction_type,
+      quantity: r.quantity,
+      unit: r.unit,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+      deletedAt: r.deleted_at,
+      version: r.version,
+      deviceId: r.device_id,
+    }));
+  },
+  async save(
+    input: Omit<
+      MobileModuleRecord,
+      "id" | "createdAt" | "updatedAt" | "deletedAt" | "version" | "deviceId"
+    >,
+    id?: string,
+  ) {
+    const db = await getDatabase(),
+      now = new Date().toISOString(),
+      deviceId = await getDeviceId();
+    const previous = id
+      ? await db.getFirstAsync<{ created_at: string; version: number }>(
+          "SELECT created_at,version FROM module_records WHERE id=?",
+          id,
+        )
+      : null;
+    const record: MobileModuleRecord = {
+      ...input,
+      id: id ?? uuid(),
+      createdAt: previous?.created_at ?? now,
+      updatedAt: now,
+      deletedAt: null,
+      version: (previous?.version ?? 0) + 1,
+      deviceId,
+    };
+    await db.withTransactionAsync(async () => {
+      await db.runAsync(
+        `INSERT INTO module_records(id,module,title,category,date,description,amount,dog_id,phone,whatsapp,email,transaction_type,quantity,unit,created_at,updated_at,deleted_at,version,device_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET module=excluded.module,title=excluded.title,category=excluded.category,date=excluded.date,description=excluded.description,amount=excluded.amount,dog_id=excluded.dog_id,phone=excluded.phone,whatsapp=excluded.whatsapp,email=excluded.email,transaction_type=excluded.transaction_type,quantity=excluded.quantity,unit=excluded.unit,updated_at=excluded.updated_at,deleted_at=NULL,version=excluded.version,device_id=excluded.device_id`,
+        record.id,
+        record.module,
+        record.title,
+        record.category,
+        record.date,
+        record.description,
+        record.amount,
+        record.dogId,
+        record.phone,
+        record.whatsapp,
+        record.email,
+        record.transactionType,
+        record.quantity,
+        record.unit,
+        record.createdAt,
+        record.updatedAt,
+        null,
+        record.version,
+        record.deviceId,
+      );
+      await queue(
+        db,
+        "module_records",
+        record.id,
+        previous ? "update" : "create",
+        { ...record },
+      );
+    });
+    return record;
+  },
+  async remove(id: string) {
+    const db = await getDatabase(),
+      row = await db.getFirstAsync<any>(
+        "SELECT * FROM module_records WHERE id=? AND deleted_at IS NULL",
+        id,
+      );
+    if (!row) return;
+    const now = new Date().toISOString(),
+      record = {
+        id: row.id,
+        module: row.module,
+        title: row.title,
+        category: row.category,
+        date: row.date,
+        description: row.description,
+        amount: row.amount,
+        dogId: row.dog_id,
+        phone: row.phone,
+        whatsapp: row.whatsapp,
+        email: row.email,
+        transactionType: row.transaction_type,
+        quantity: row.quantity,
+        unit: row.unit,
+        createdAt: row.created_at,
+        updatedAt: now,
+        deletedAt: now,
+        version: row.version + 1,
+        deviceId: row.device_id,
+      };
+    await db.withTransactionAsync(async () => {
+      await db.runAsync(
+        "UPDATE module_records SET deleted_at=?,updated_at=?,version=? WHERE id=?",
+        now,
+        now,
+        record.version,
+        id,
+      );
+      await queue(db, "module_records", id, "delete", record);
+    });
+  },
+};
 
 export const syncService = {
   async summary() {
@@ -815,11 +1094,12 @@ export const syncService = {
             "SELECT weight_grams FROM weight_records WHERE dog_id=? AND deleted_at IS NULL ORDER BY date DESC,updated_at DESC LIMIT 1",
             String(p.dogId),
           );
-          if (latestWeight) await db.runAsync(
-            "UPDATE dogs SET weight_kg=? WHERE id=?",
-            latestWeight.weight_grams / 1000,
-            String(p.dogId),
-          );
+          if (latestWeight)
+            await db.runAsync(
+              "UPDATE dogs SET weight_kg=? WHERE id=?",
+              latestWeight.weight_grams / 1000,
+              String(p.dogId),
+            );
         } else if (event.entityType === "feeding_plans") {
           await db.runAsync(
             `INSERT INTO feeding_plans(id,dog_id,food_name,kcal_per_kg,daily_grams,grams_per_meal,meals_per_day,times_json,life_stage,goal,adjustment_percent,created_at,updated_at,deleted_at,version,device_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET dog_id=excluded.dog_id,food_name=excluded.food_name,kcal_per_kg=excluded.kcal_per_kg,daily_grams=excluded.daily_grams,grams_per_meal=excluded.grams_per_meal,meals_per_day=excluded.meals_per_day,times_json=excluded.times_json,life_stage=excluded.life_stage,goal=excluded.goal,adjustment_percent=excluded.adjustment_percent,updated_at=excluded.updated_at,deleted_at=excluded.deleted_at,version=excluded.version,device_id=excluded.device_id WHERE excluded.version>feeding_plans.version OR (excluded.version=feeding_plans.version AND excluded.updated_at>feeding_plans.updated_at)`,
@@ -843,7 +1123,25 @@ export const syncService = {
         } else if (event.entityType === "module_records") {
           await db.runAsync(
             `INSERT INTO module_records(id,module,title,category,date,description,amount,dog_id,phone,whatsapp,email,transaction_type,quantity,unit,created_at,updated_at,deleted_at,version,device_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET module=excluded.module,title=excluded.title,category=excluded.category,date=excluded.date,description=excluded.description,amount=excluded.amount,dog_id=excluded.dog_id,phone=excluded.phone,whatsapp=excluded.whatsapp,email=excluded.email,transaction_type=excluded.transaction_type,quantity=excluded.quantity,unit=excluded.unit,updated_at=excluded.updated_at,deleted_at=excluded.deleted_at,version=excluded.version,device_id=excluded.device_id WHERE excluded.version>module_records.version OR (excluded.version=module_records.version AND excluded.updated_at>module_records.updated_at)`,
-            String(p.id),String(p.module),String(p.title),String(p.category),String(p.date),String(p.description??''),p.amount==null?null:Number(p.amount),p.dogId==null?null:String(p.dogId),String(p.phone??''),String(p.whatsapp??''),String(p.email??''),p.transactionType==null?null:String(p.transactionType),p.quantity==null?null:Number(p.quantity),String(p.unit??''),String(p.createdAt),String(p.updatedAt),p.deletedAt==null?null:String(p.deletedAt),Number(p.version),String(p.deviceId)
+            String(p.id),
+            String(p.module),
+            String(p.title),
+            String(p.category),
+            String(p.date),
+            String(p.description ?? ""),
+            p.amount == null ? null : Number(p.amount),
+            p.dogId == null ? null : String(p.dogId),
+            String(p.phone ?? ""),
+            String(p.whatsapp ?? ""),
+            String(p.email ?? ""),
+            p.transactionType == null ? null : String(p.transactionType),
+            p.quantity == null ? null : Number(p.quantity),
+            String(p.unit ?? ""),
+            String(p.createdAt),
+            String(p.updatedAt),
+            p.deletedAt == null ? null : String(p.deletedAt),
+            Number(p.version),
+            String(p.deviceId),
           );
         }
         await db.runAsync(

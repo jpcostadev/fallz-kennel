@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePicker from "@react-native-community/datetimepicker";
 import {
   Platform,
   Pressable,
@@ -18,11 +18,19 @@ import {
   type LifeStage,
   type WeightGoal,
 } from "@fallz/core";
-import { dogService, feedingService, type MobileDog, type WeightRecord } from "../src/database";
-import { cancelDogFeedingNotifications, scheduleDailyFeedingNotification } from "../src/notifications";
+import {
+  dogService,
+  feedingService,
+  type MobileDog,
+  type WeightRecord,
+} from "../src/database";
+import {
+  cancelDogFeedingNotifications,
+  scheduleDailyFeedingNotification,
+} from "../src/notifications";
 import { colors, common } from "../src/theme";
-import { DogPicker } from '../src/DogPicker';
-import { ThemedDialog } from '../src/ThemedDialog';
+import { DogPicker } from "../src/DogPicker";
+import { ThemedDialog } from "../src/ThemedDialog";
 
 const stages: Array<[LifeStage, string]> = [
   ["puppy-under-4m", "Filhote até 4 meses"],
@@ -31,6 +39,13 @@ const stages: Array<[LifeStage, string]> = [
   ["adult-neutered", "Adulto castrado"],
   ["senior", "Idoso"],
 ];
+const suggestedTimes: Record<number, string[]> = {
+  2: ["07:00", "19:00"],
+  3: ["07:00", "13:00", "19:00"],
+  4: ["07:00", "11:00", "15:00", "19:00"],
+  5: ["07:00", "10:00", "13:00", "16:00", "19:00"],
+  6: ["07:00", "09:30", "12:00", "14:30", "17:00", "19:30"],
+};
 export default function Feeding() {
   const [dogs, setDogs] = useState<MobileDog[]>([]);
   const [dogId, setDogId] = useState("");
@@ -40,8 +55,11 @@ export default function Feeding() {
   const [goal, setGoal] = useState<WeightGoal>("maintain");
   const [meals, setMeals] = useState("4");
   const [times, setTimes] = useState(["07:00", "11:00", "15:00", "19:00"]);
-  const [timePicker,setTimePicker]=useState<number|null>(null);
-  const [dialog,setDialog]=useState<{title:string;message:string}|null>(null);
+  const [timePicker, setTimePicker] = useState<number | null>(null);
+  const [dialog, setDialog] = useState<{
+    title: string;
+    message: string;
+  } | null>(null);
   const [adjustment, setAdjustment] = useState(0);
   const [weightHistory, setWeightHistory] = useState<WeightRecord[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -54,8 +72,36 @@ export default function Feeding() {
     }, []),
   );
   const dog = dogs.find((item) => item.id === dogId);
-  const refresh=async()=>{setRefreshing(true);try{const rows=await dogService.list();setDogs(rows);if(dogId)setWeightHistory(await dogService.weights(dogId))}finally{setRefreshing(false)}};
-  useEffect(() => { if (!dogId) return; void Promise.all([feedingService.find(dogId),dogService.weights(dogId)]).then(([saved,history]) => { setWeightHistory(history); if (!saved) { setAdjustment(0); return; } setFoodName(saved.foodName); setKcal(String(saved.kcalPerKg)); setStage(saved.lifeStage); setGoal(saved.goal); setMeals(String(saved.mealsPerDay)); setTimes(saved.times); setAdjustment(saved.adjustmentPercent); }); }, [dogId]);
+  const refresh = async () => {
+    setRefreshing(true);
+    try {
+      const rows = await dogService.list();
+      setDogs(rows);
+      if (dogId) setWeightHistory(await dogService.weights(dogId));
+    } finally {
+      setRefreshing(false);
+    }
+  };
+  useEffect(() => {
+    if (!dogId) return;
+    void Promise.all([
+      feedingService.find(dogId),
+      dogService.weights(dogId),
+    ]).then(([saved, history]) => {
+      setWeightHistory(history);
+      if (!saved) {
+        setAdjustment(0);
+        return;
+      }
+      setFoodName(saved.foodName);
+      setKcal(String(saved.kcalPerKg));
+      setStage(saved.lifeStage);
+      setGoal(saved.goal);
+      setMeals(String(saved.mealsPerDay));
+      setTimes(saved.times);
+      setAdjustment(saved.adjustmentPercent);
+    });
+  }, [dogId]);
   const plan = useMemo(() => {
     try {
       return dog
@@ -72,7 +118,30 @@ export default function Feeding() {
       return null;
     }
   }, [dog, kcal, stage, goal, meals, adjustment]);
-  const recommendation = useMemo(() => { try { if (weightHistory.length < 2) return null; const previous=weightHistory.at(-2)!,current=weightHistory.at(-1)!,elapsed=Math.max(1,Math.round((Date.parse(current.date)-Date.parse(previous.date))/86400000)); return suggestFeedingAdjustment({previousWeightKg:previous.weightGrams/1000,currentWeightKg:current.weightGrams/1000,daysBetween:elapsed,bodyConditionScore:current.bodyConditionScore,lifeStage:stage,goal,currentAdjustmentPercent:adjustment}); } catch { return null; } },[weightHistory,stage,goal,adjustment]);
+  const recommendation = useMemo(() => {
+    try {
+      if (weightHistory.length < 2) return null;
+      const previous = weightHistory.at(-2)!,
+        current = weightHistory.at(-1)!,
+        elapsed = Math.max(
+          1,
+          Math.round(
+            (Date.parse(current.date) - Date.parse(previous.date)) / 86400000,
+          ),
+        );
+      return suggestFeedingAdjustment({
+        previousWeightKg: previous.weightGrams / 1000,
+        currentWeightKg: current.weightGrams / 1000,
+        daysBetween: elapsed,
+        bodyConditionScore: current.bodyConditionScore,
+        lifeStage: stage,
+        goal,
+        currentAdjustmentPercent: adjustment,
+      });
+    } catch {
+      return null;
+    }
+  }, [weightHistory, stage, goal, adjustment]);
   async function save() {
     try {
       if (!dog || !plan || !foodName.trim())
@@ -104,128 +173,232 @@ export default function Feeding() {
         goal,
         adjustmentPercent: adjustment,
       });
-      setDialog({title:"Plano salvo",message:`${plan.gramsPerMeal} g, ${plan.mealsPerDay} vezes ao dia. Lembretes programados.`});
+      setDialog({
+        title: "Plano salvo",
+        message: `${plan.gramsPerMeal} g, ${plan.mealsPerDay} vezes ao dia. Lembretes programados.`,
+      });
     } catch (error) {
-      setDialog({title:"Não foi possível salvar",message:error instanceof Error ? error.message : "Confira os dados."});
+      setDialog({
+        title: "Não foi possível salvar",
+        message: error instanceof Error ? error.message : "Confira os dados.",
+      });
     }
   }
   return (
-    <SafeAreaView style={common.screen} edges={["top","left","right"]}><ScrollView contentContainerStyle={common.content} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>void refresh()} tintColor={colors.blue} colors={[colors.blue]}/> }>
-      <Text style={common.eyebrow}>NUTRIÇÃO</Text>
-      <Text style={common.title}>Alimentação</Text>
-      <Text style={common.subtitle}>
-        Estimativa inicial baseada no peso e na energia da ração.
-      </Text>
-      <Text style={common.label}>SELECIONE O CÃO</Text>
-      <DogPicker dogs={dogs} value={dogId||null} onChange={(id)=>setDogId(id??'')}/>
-      <View style={common.card}>
-        <Text style={common.label}>RAÇÃO</Text>
-        <TextInput
-          style={common.input}
-          value={foodName}
-          onChangeText={setFoodName}
-          placeholder="Marca e linha"
-          placeholderTextColor={colors.muted}
+    <SafeAreaView style={common.screen} edges={["top", "left", "right"]}>
+      <ScrollView
+        contentContainerStyle={common.content}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void refresh()}
+            tintColor={colors.blue}
+            colors={[colors.blue]}
+          />
+        }
+      >
+        <Text style={common.eyebrow}>NUTRIÇÃO</Text>
+        <Text style={common.title}>Alimentação</Text>
+        <Text style={common.subtitle}>
+          Estimativa inicial baseada no peso e na energia da ração.
+        </Text>
+        <Text style={common.label}>SELECIONE O CÃO</Text>
+        <DogPicker
+          dogs={dogs}
+          value={dogId || null}
+          onChange={(id) => setDogId(id ?? "")}
         />
-        <Text style={common.label}>ENERGIA DA EMBALAGEM (KCAL/KG)</Text>
-        <TextInput
-          style={common.input}
-          value={kcal}
-          onChangeText={setKcal}
-          keyboardType="number-pad"
-          placeholder="Ex.: 3850"
-          placeholderTextColor={colors.muted}
-        />
-        <Text style={common.label}>FASE</Text>
-        {stages.map(([value, label]) => (
-          <Pressable
-            key={value}
-            onPress={() => {
-              setStage(value);
-              setMeals(
-                value === "puppy-under-4m"
-                  ? "4"
-                  : value === "puppy-over-4m"
-                    ? "3"
-                    : "2",
-              );
-            }}
-            style={[
-              common.actionButton,
-              { padding: 12, marginBottom:8 },
-              stage === value && common.selected,
-            ]}
-          >
-            <Text style={{ color: colors.text }}>{label}</Text>
-          </Pressable>
-        ))}
-        <Text style={common.label}>OBJETIVO</Text>
-        <View style={[common.row, { marginBottom: 12 }]}>
-          {(
-            [
-              ["lose", "Perder"],
-              ["maintain", "Manter"],
-              ["gain", "Ganhar"],
-            ] as const
-          ).map(([value, label]) => (
+        <View style={common.card}>
+          <Text style={common.label}>RAÇÃO</Text>
+          <TextInput
+            style={common.input}
+            value={foodName}
+            onChangeText={setFoodName}
+            placeholder="Marca e linha"
+            placeholderTextColor={colors.muted}
+          />
+          <Text style={common.label}>ENERGIA DA EMBALAGEM (KCAL/KG)</Text>
+          <TextInput
+            style={common.input}
+            value={kcal}
+            onChangeText={setKcal}
+            keyboardType="number-pad"
+            placeholder="Ex.: 3850"
+            placeholderTextColor={colors.muted}
+          />
+          <Text style={common.label}>FASE</Text>
+          {stages.map(([value, label]) => (
             <Pressable
               key={value}
-              onPress={() => setGoal(value)}
+              onPress={() => {
+                setStage(value);
+                const count =
+                  value === "puppy-under-4m"
+                    ? "4"
+                    : value === "puppy-over-4m"
+                      ? "3"
+                      : "2";
+                setMeals(count);
+                setTimes(suggestedTimes[Number(count)]);
+              }}
               style={[
                 common.actionButton,
-                { flex: 1, padding: 10 },
-                goal === value && common.selected,
+                { padding: 12, marginBottom: 8 },
+                stage === value && common.selected,
               ]}
             >
-              <Text style={{ color: colors.text, textAlign: "center" }}>
-                {label}
-              </Text>
+              <Text style={{ color: colors.text }}>{label}</Text>
             </Pressable>
           ))}
+          <Text style={common.label}>OBJETIVO</Text>
+          <View style={[common.row, { marginBottom: 12 }]}>
+            {(
+              [
+                ["lose", "Perder"],
+                ["maintain", "Manter"],
+                ["gain", "Ganhar"],
+              ] as const
+            ).map(([value, label]) => (
+              <Pressable
+                key={value}
+                onPress={() => setGoal(value)}
+                style={[
+                  common.actionButton,
+                  { flex: 1, padding: 10 },
+                  goal === value && common.selected,
+                ]}
+              >
+                <Text style={{ color: colors.text, textAlign: "center" }}>
+                  {label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <Text style={common.label}>REFEIÇÕES POR DIA</Text>
+          <View style={[common.row, { marginBottom: 14 }]}>
+            {[2, 3, 4, 5, 6].map((n) => (
+              <Pressable
+                key={n}
+                style={[
+                  common.actionButton,
+                  { flex: 1 },
+                  Number(meals) === n && common.selected,
+                ]}
+                onPress={() => {
+                  setMeals(String(n));
+                  setTimes(suggestedTimes[n]);
+                }}
+              >
+                <Text style={{ color: colors.text, fontWeight: "800" }}>
+                  {n}×
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <Text style={common.label}>HORÁRIOS</Text>
+          <View style={[common.row, { marginBottom: 8 }]}>
+            {times.slice(0, Number(meals)).map((time, index) => (
+              <Pressable
+                key={index}
+                style={[
+                  common.actionButton,
+                  { width: "47%", justifyContent: "center" },
+                ]}
+                onPress={() => setTimePicker(index)}
+              >
+                <Ionicons name="time-outline" size={18} color={colors.blue} />
+                <Text style={{ color: colors.text, fontWeight: "800" }}>
+                  {time}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          {timePicker !== null && (
+            <DateTimePicker
+              value={new Date(`2000-01-01T${times[timePicker] ?? "07:00"}:00`)}
+              mode="time"
+              is24Hour
+              display={Platform.OS === "ios" ? "spinner" : "default"}
+              onChange={(_, value) => {
+                if (Platform.OS !== "ios") setTimePicker(null);
+                if (value)
+                  setTimes((current) =>
+                    current.map((item, i) =>
+                      i === timePicker
+                        ? `${String(value.getHours()).padStart(2, "0")}:${String(value.getMinutes()).padStart(2, "0")}`
+                        : item,
+                    ),
+                  );
+              }}
+            />
+          )}
         </View>
-        <Text style={common.label}>REFEIÇÕES POR DIA</Text>
-        <View style={[common.row,{marginBottom:14}]}>{[2,3,4,5,6].map(n=><Pressable key={n} style={[common.actionButton,{flex:1},Number(meals)===n&&common.selected]} onPress={()=>{setMeals(String(n));setTimes(current=>Array.from({length:n},(_,i)=>current[i]??`${String(7+i*3).padStart(2,'0')}:00`))}}><Text style={{color:colors.text,fontWeight:'800'}}>{n}×</Text></Pressable>)}</View>
-        <Text style={common.label}>HORÁRIOS</Text>
-        <View style={[common.row,{marginBottom:8}]}>{times.slice(0,Number(meals)).map((time,index)=><Pressable key={index} style={[common.actionButton,{width:'47%',justifyContent:'center'}]} onPress={()=>setTimePicker(index)}><Ionicons name="time-outline" size={18} color={colors.blue}/><Text style={{color:colors.text,fontWeight:'800'}}>{time}</Text></Pressable>)}</View>
-        {timePicker!==null&&<DateTimePicker value={new Date(`2000-01-01T${times[timePicker]??'07:00'}:00`)} mode="time" is24Hour display={Platform.OS==='ios'?'spinner':'default'} onChange={(_,value)=>{if(Platform.OS!=='ios')setTimePicker(null);if(value)setTimes(current=>current.map((item,i)=>i===timePicker?`${String(value.getHours()).padStart(2,'0')}:${String(value.getMinutes()).padStart(2,'0')}`:item))}}/>}
-      </View>
-      {plan && (
-        <View style={[common.card, { borderColor: colors.blue }]}>
-          <Text style={common.label}>PORÇÃO CALCULADA</Text>
-          <Text style={[common.value, { color: colors.blue }]}>
-            {plan.gramsPerMeal} g por refeição
+        {plan && (
+          <View style={[common.card, { borderColor: colors.blue }]}>
+            <Text style={common.label}>PORÇÃO CALCULADA</Text>
+            <Text style={[common.value, { color: colors.blue }]}>
+              {plan.gramsPerMeal} g por refeição
+            </Text>
+            <Text style={[common.muted, { marginTop: 7 }]}>
+              {plan.mealsPerDay}× ao dia · {plan.dailyGrams} g/dia ·{" "}
+              {plan.dailyKcal} kcal/dia
+            </Text>
+            <Text style={[common.muted, { marginTop: 7 }]}>
+              RER: {plan.rerKcal} kcal · fator inicial: {plan.factor}
+            </Text>
+          </View>
+        )}
+        {recommendation && (
+          <View style={[common.card, { borderColor: colors.green }]}>
+            <Text style={{ color: colors.green, fontWeight: "800" }}>
+              AJUSTE PELA EVOLUÇÃO
+            </Text>
+            <Text style={[common.muted, { marginTop: 7 }]}>
+              Variação:{" "}
+              {recommendation.weeklyChangePercent.toLocaleString("pt-BR")}
+              %/semana. {recommendation.reason}
+            </Text>
+            <Text style={[common.value, { marginTop: 10 }]}>
+              {recommendation.recommendedAdjustmentPercent > 0 ? "+" : ""}
+              {recommendation.recommendedAdjustmentPercent}%
+            </Text>
+            {recommendation.recommendedAdjustmentPercent !== adjustment && (
+              <Pressable
+                style={[common.button, { marginTop: 12 }]}
+                onPress={() =>
+                  setAdjustment(recommendation.recommendedAdjustmentPercent)
+                }
+              >
+                <Text style={common.buttonText}>Aplicar ajuste sugerido</Text>
+              </Pressable>
+            )}
+          </View>
+        )}
+        <View style={[common.card, { borderColor: "#5a4721" }]}>
+          <Text style={{ color: "#f6c453", fontWeight: "800" }}>
+            Importante
           </Text>
           <Text style={[common.muted, { marginTop: 7 }]}>
-            {plan.mealsPerDay}× ao dia · {plan.dailyGrams} g/dia ·{" "}
-            {plan.dailyKcal} kcal/dia
-          </Text>
-          <Text style={[common.muted, { marginTop: 7 }]}>
-            RER: {plan.rerKcal} kcal · fator inicial: {plan.factor}
+            É uma estimativa inicial, não uma prescrição. Filhotes, gestantes,
+            animais doentes ou fora do escore corporal ideal precisam de
+            avaliação veterinária. Reavalie peso e BCS regularmente.
           </Text>
         </View>
-      )}
-      {recommendation && (
-        <View style={[common.card, { borderColor: colors.green }]}>
-          <Text style={{ color: colors.green, fontWeight: "800" }}>AJUSTE PELA EVOLUÇÃO</Text>
-          <Text style={[common.muted, { marginTop: 7 }]}>Variação: {recommendation.weeklyChangePercent.toLocaleString("pt-BR")}%/semana. {recommendation.reason}</Text>
-          <Text style={[common.value, { marginTop: 10 }]}>{recommendation.recommendedAdjustmentPercent > 0 ? "+" : ""}{recommendation.recommendedAdjustmentPercent}%</Text>
-          {recommendation.recommendedAdjustmentPercent !== adjustment && <Pressable style={[common.button, { marginTop: 12 }]} onPress={() => setAdjustment(recommendation.recommendedAdjustmentPercent)}><Text style={common.buttonText}>Aplicar ajuste sugerido</Text></Pressable>}
-        </View>
-      )}
-      <View style={[common.card, { borderColor: "#5a4721" }]}>
-        <Text style={{ color: "#f6c453", fontWeight: "800" }}>Importante</Text>
-        <Text style={[common.muted, { marginTop: 7 }]}>
-          É uma estimativa inicial, não uma prescrição. Filhotes, gestantes,
-          animais doentes ou fora do escore corporal ideal precisam de avaliação
-          veterinária. Reavalie peso e BCS regularmente.
-        </Text>
-      </View>
-      <Pressable
-        style={[common.button, { marginBottom: 40 }]}
-        onPress={() => void save()}
-      >
-        <Ionicons name="save-outline" size={19} color="white" /><Text style={common.buttonText}>Salvar e criar lembretes</Text>
-      </Pressable>
-    </ScrollView><ThemedDialog visible={!!dialog} title={dialog?.title??''} message={dialog?.message??''} onClose={()=>setDialog(null)}/></SafeAreaView>
+        <Pressable
+          style={[common.button, { marginBottom: 40 }]}
+          onPress={() => void save()}
+        >
+          <Ionicons name="save-outline" size={19} color="white" />
+          <Text style={common.buttonText}>Salvar e criar lembretes</Text>
+        </Pressable>
+      </ScrollView>
+      <ThemedDialog
+        visible={!!dialog}
+        title={dialog?.title ?? ""}
+        message={dialog?.message ?? ""}
+        onClose={() => setDialog(null)}
+      />
+    </SafeAreaView>
   );
 }
