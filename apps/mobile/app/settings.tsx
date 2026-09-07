@@ -18,6 +18,7 @@ import {
   type UpdateStage,
 } from "../src/app-updates";
 import { ThemedDialog } from "../src/ThemedDialog";
+import { scheduleCareNotification } from "../src/notifications";
 
 export default function Settings() {
   const router = useRouter(),
@@ -36,6 +37,24 @@ export default function Settings() {
       await checkAndInstallUpdate(setUpdateStage, setDialog);
     } finally {
       setRefreshing(false);
+    }
+  }
+  async function testNotification() {
+    try {
+      await scheduleCareNotification(
+        "Teste do Fallz Kennel",
+        "As notificações do canil estão funcionando.",
+        new Date(Date.now() + 5000),
+      );
+      setDialog({
+        title: "Teste agendado",
+        message: "A notificação de teste aparecerá em aproximadamente 5 segundos.",
+      });
+    } catch (error) {
+      setDialog({
+        title: "Notificação bloqueada",
+        message: error instanceof Error ? error.message : "Confira a permissão do aplicativo.",
+      });
     }
   }
   return (
@@ -104,6 +123,15 @@ export default function Settings() {
             />
             <Text style={{ color: colors.text, fontWeight: "800" }}>
               Abrir configurações do celular
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[common.actionButton, { marginTop: 10 }]}
+            onPress={() => void testNotification()}
+          >
+            <Ionicons name="notifications-circle-outline" size={20} color={colors.blue} />
+            <Text style={{ color: colors.text, fontWeight: "800" }}>
+              Testar notificação em 5 segundos
             </Text>
           </Pressable>
         </View>

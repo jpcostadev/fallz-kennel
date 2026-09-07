@@ -809,7 +809,7 @@ export default function Dogs() {
         message={dialog?.message ?? ""}
         onClose={() => setDialog(null)}
         onConfirm={dialog?.action}
-        confirmLabel="Excluir"
+        confirmLabel={dialog?.action ? "Excluir" : "OK"}
         danger={dialog?.danger}
       />
     </SafeAreaView>

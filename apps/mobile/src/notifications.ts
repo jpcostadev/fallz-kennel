@@ -1,4 +1,6 @@
 import * as Notifications from 'expo-notifications'
+import * as Device from 'expo-device'
+import Constants from 'expo-constants'
 import { Platform } from 'react-native'
 
 Notifications.setNotificationHandler({ handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }) })
@@ -8,6 +10,13 @@ export async function prepareNotifications(): Promise<boolean> {
   const current = await Notifications.getPermissionsAsync()
   const permission = current.status === 'granted' ? current : await Notifications.requestPermissionsAsync()
   return permission.status === 'granted'
+}
+
+export async function getRemotePushToken(): Promise<string | null> {
+  if (!Device.isDevice || !(await prepareNotifications())) return null
+  const projectId = Constants.expoConfig?.extra?.eas?.projectId as string | undefined
+  if (!projectId) throw new Error('Projeto EAS não configurado para notificações push.')
+  return (await Notifications.getExpoPushTokenAsync({ projectId })).data
 }
 
 export async function scheduleCareNotification(title: string, body: string, date: Date): Promise<string> {

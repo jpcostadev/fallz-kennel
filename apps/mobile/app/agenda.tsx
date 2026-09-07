@@ -31,7 +31,8 @@ export default function Agenda() {
   const [items, setItems] = useState<Reminder[]>([]);
   const [dogId, setDogId] = useState<string | null>(null);
   const [title, setTitle] = useState("Consulta veterinária");
-  const [dateTime, setDateTime] = useState("");
+  const [appointmentDate, setAppointmentDate] = useState<Date | null>(null);
+  const [appointmentTime, setAppointmentTime] = useState<Date | null>(null);
   const [editing, setEditing] = useState<Reminder | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [showDate, setShowDate] = useState(false),
@@ -66,9 +67,13 @@ export default function Agenda() {
   };
   async function save() {
     try {
-      const date = new Date(dateTime);
-      if (!title.trim() || Number.isNaN(date.getTime()))
-        throw new Error("Informe título e data no formato correto.");
+      if (!title.trim()) throw new Error("Informe o título do lembrete.");
+      if (!appointmentDate) throw new Error("Selecione a data do lembrete.");
+      if (!appointmentTime) throw new Error("Selecione o horário do lembrete.");
+      const date = new Date(appointmentDate);
+      date.setHours(appointmentTime.getHours(), appointmentTime.getMinutes(), 0, 0);
+      if (date.getTime() <= Date.now())
+        throw new Error("Selecione uma data e um horário futuros.");
       const dog = dogs.find((d) => d.id === dogId);
       const notificationId = await scheduleCareNotification(
         title,
@@ -86,7 +91,8 @@ export default function Agenda() {
         await cancelCareNotification(editing.notificationId);
         await reminderService.update(editing.id, input);
       } else await reminderService.create(input);
-      setDateTime("");
+      setAppointmentDate(null);
+      setAppointmentTime(null);
       setEditing(null);
       load();
     } catch (error) {
@@ -138,12 +144,12 @@ export default function Agenda() {
               <Ionicons name="calendar-outline" size={18} color={colors.blue} />
               <Text
                 style={{
-                  color: dateTime ? colors.text : colors.muted,
+                  color: appointmentDate ? colors.text : colors.muted,
                   fontWeight: "800",
                 }}
               >
-                {dateTime
-                  ? new Date(dateTime).toLocaleDateString("pt-BR")
+                {appointmentDate
+                  ? appointmentDate.toLocaleDateString("pt-BR")
                   : "Selecionar data"}
               </Text>
             </Pressable>
@@ -154,12 +160,12 @@ export default function Agenda() {
               <Ionicons name="time-outline" size={18} color={colors.blue} />
               <Text
                 style={{
-                  color: dateTime ? colors.text : colors.muted,
+                  color: appointmentTime ? colors.text : colors.muted,
                   fontWeight: "800",
                 }}
               >
-                {dateTime
-                  ? new Date(dateTime).toLocaleTimeString("pt-BR", {
+                {appointmentTime
+                  ? appointmentTime.toLocaleTimeString("pt-BR", {
                       hour: "2-digit",
                       minute: "2-digit",
                     })
@@ -169,32 +175,28 @@ export default function Agenda() {
           </View>
           {showDate && (
             <DateTimePicker
-              value={dateTime ? new Date(dateTime) : new Date()}
+              value={appointmentDate ?? new Date()}
               minimumDate={new Date()}
               mode="date"
               display={Platform.OS === "ios" ? "spinner" : "default"}
               onChange={(_, date) => {
                 setShowDate(Platform.OS === "ios");
                 if (date) {
-                  const current = dateTime ? new Date(dateTime) : new Date();
-                  date.setHours(current.getHours(), current.getMinutes(), 0, 0);
-                  setDateTime(date.toISOString());
+                  setAppointmentDate(date);
                 }
               }}
             />
           )}
           {showTime && (
             <DateTimePicker
-              value={dateTime ? new Date(dateTime) : new Date()}
+              value={appointmentTime ?? new Date()}
               mode="time"
               is24Hour
               display={Platform.OS === "ios" ? "spinner" : "default"}
               onChange={(_, time) => {
                 setShowTime(Platform.OS === "ios");
                 if (time) {
-                  const current = dateTime ? new Date(dateTime) : new Date();
-                  current.setHours(time.getHours(), time.getMinutes(), 0, 0);
-                  setDateTime(current.toISOString());
+                  setAppointmentTime(time);
                 }
               }}
             />
@@ -221,9 +223,8 @@ export default function Agenda() {
                   setDogId(item.dogId);
                   setTitle(item.title);
                   const d = new Date(item.dateTime);
-                  setDateTime(
-                    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}T${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`,
-                  );
+                  setAppointmentDate(new Date(d));
+                  setAppointmentTime(new Date(d));
                 }}
               >
                 <Text style={{ color: colors.blue }}>Editar</Text>
@@ -256,7 +257,7 @@ export default function Agenda() {
         message={dialog?.message ?? ""}
         onClose={() => setDialog(null)}
         onConfirm={dialog?.action}
-        confirmLabel="Excluir"
+        confirmLabel={dialog?.action ? "Excluir" : "OK"}
         danger={dialog?.danger}
       />
     </SafeAreaView>

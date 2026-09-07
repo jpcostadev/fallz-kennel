@@ -13,8 +13,11 @@ import {
   getFirestore,
   setDoc,
 } from "firebase/firestore";
+import * as Crypto from "expo-crypto";
+import { Platform } from "react-native";
 import { syncService, type CloudEntity, type CloudEvent } from "./database";
 import { importAgendaEvents } from "./agenda-sync";
+import { getRemotePushToken } from "./notifications";
 
 const app = initializeApp({
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -38,6 +41,22 @@ export const observeUser = (callback: (user: User | null) => void) =>
 export const login = (email: string, password: string) =>
   signInWithEmailAndPassword(auth, email.trim(), password);
 export const logout = () => signOut(auth);
+export async function registerPushDevice(): Promise<void> {
+  const user = auth.currentUser;
+  if (!user) return;
+  const token = await getRemotePushToken();
+  if (!token) return;
+  const deviceId = await Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    token,
+  );
+  await setDoc(doc(firestore, "users", user.uid, "push_devices", deviceId), {
+    token,
+    platform: Platform.OS,
+    enabled: true,
+    updatedAt: new Date().toISOString(),
+  });
+}
 export async function synchronize() {
   const user = auth.currentUser;
   if (!user) throw new Error("Entre na conta Firebase.");

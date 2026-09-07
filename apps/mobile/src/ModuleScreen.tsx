@@ -14,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import { DogPicker } from "./DogPicker";
+import { ThemedDialog } from "./ThemedDialog";
 import { colors, common } from "./theme";
 import {
   dogService,
@@ -487,47 +488,21 @@ export function ModuleScreen({ module }: { module: MobileModule }) {
           </SafeAreaView>
         </View>
       </Modal>
-      <Modal visible={Boolean(deleting)} transparent animationType="fade">
-        <View
-          style={[
-            common.modalBackdrop,
-            { justifyContent: "center", padding: 24 },
-          ]}
-        >
-          <View style={common.card}>
-            <Text
-              style={{ color: colors.text, fontSize: 20, fontWeight: "900" }}
-            >
-              Excluir registro?
-            </Text>
-            <Text style={[common.muted, { marginVertical: 12 }]}>
-              Esta ação será sincronizada com todos os dispositivos.
-            </Text>
-            <View style={[common.row, { flexWrap: "nowrap" }]}>
-              <Pressable
-                style={[common.actionButton, { flex: 1 }]}
-                onPress={() => setDeleting(null)}
-              >
-                <Text style={{ color: colors.text, fontWeight: "800" }}>
-                  Cancelar
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[common.button, { flex: 1, backgroundColor: "#b72d45" }]}
-                onPress={() => {
-                  if (deleting)
-                    void moduleService.remove(deleting.id).then(() => {
-                      setDeleting(null);
-                      return load();
-                    });
-                }}
-              >
-                <Text style={common.buttonText}>Excluir</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      <ThemedDialog
+        visible={Boolean(deleting)}
+        title="Excluir registro?"
+        message="Esta ação será sincronizada com todos os dispositivos."
+        onClose={() => setDeleting(null)}
+        onConfirm={() => {
+          if (deleting)
+            void moduleService.remove(deleting.id).then(() => {
+              setDeleting(null);
+              return load();
+            });
+        }}
+        confirmLabel="Excluir"
+        danger
+      />
     </SafeAreaView>
   );
 }

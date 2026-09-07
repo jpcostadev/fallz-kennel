@@ -11,7 +11,7 @@ import { Tabs, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { colors } from "../src/theme";
-import { synchronize } from "../src/firebase";
+import { observeUser, registerPushDevice, synchronize } from "../src/firebase";
 import { registerBackgroundDatabaseSync } from "../src/background-sync";
 
 type IconName = React.ComponentProps<typeof Ionicons>["name"];
@@ -63,9 +63,13 @@ export default function Layout() {
       if (state === "active") run();
     });
     void registerBackgroundDatabaseSync();
+    const unsubscribeAuth = observeUser((user) => {
+      if (user) void registerPushDevice().catch(() => undefined);
+    });
     return () => {
       clearInterval(timer);
       subscription.remove();
+      unsubscribeAuth();
     };
   }, []);
   return (
