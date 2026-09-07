@@ -31,6 +31,7 @@ const entities = new Set<CloudEntity>([
   "dog_measurements",
   "agenda",
   "feeding_plans",
+  "module_records",
 ]);
 export const observeUser = (callback: (user: User | null) => void) =>
   onAuthStateChanged(auth, callback);

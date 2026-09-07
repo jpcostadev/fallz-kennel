@@ -2,7 +2,7 @@
   "expo": {
     "name": "Fallz Kennel",
     "slug": "fallz-kennel",
-    "version": "0.5.0",
+    "version": "0.6.0",
     "orientation": "portrait",
     "icon": "../../fallz-kennel.png",
     "scheme": "fallzkennel",
@@ -19,7 +19,7 @@
     "android": {
       "package": "com.fallzkennel.mobile",
       "googleServicesFile": "../../google-services.json",
-      "versionCode": 5,
+      "versionCode": 6,
       "permissions": [
         "SCHEDULE_EXACT_ALARM",
         "RECEIVE_BOOT_COMPLETED",
@@ -36,7 +36,9 @@
       "expo-notifications",
       "expo-updates",
       "expo-status-bar",
-      "expo-background-task"
+      "expo-background-task",
+      "@react-native-community/datetimepicker",
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true

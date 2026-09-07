@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import DateTimePicker from '@react-native-community/datetimepicker';
 import {
-  Alert,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -20,6 +21,8 @@ import {
 import { dogService, feedingService, type MobileDog, type WeightRecord } from "../src/database";
 import { cancelDogFeedingNotifications, scheduleDailyFeedingNotification } from "../src/notifications";
 import { colors, common } from "../src/theme";
+import { DogPicker } from '../src/DogPicker';
+import { ThemedDialog } from '../src/ThemedDialog';
 
 const stages: Array<[LifeStage, string]> = [
   ["puppy-under-4m", "Filhote até 4 meses"],
@@ -36,7 +39,9 @@ export default function Feeding() {
   const [stage, setStage] = useState<LifeStage>("puppy-under-4m");
   const [goal, setGoal] = useState<WeightGoal>("maintain");
   const [meals, setMeals] = useState("4");
-  const [times, setTimes] = useState("07:00, 11:00, 15:00, 19:00");
+  const [times, setTimes] = useState(["07:00", "11:00", "15:00", "19:00"]);
+  const [timePicker,setTimePicker]=useState<number|null>(null);
+  const [dialog,setDialog]=useState<{title:string;message:string}|null>(null);
   const [adjustment, setAdjustment] = useState(0);
   const [weightHistory, setWeightHistory] = useState<WeightRecord[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -50,7 +55,7 @@ export default function Feeding() {
   );
   const dog = dogs.find((item) => item.id === dogId);
   const refresh=async()=>{setRefreshing(true);try{const rows=await dogService.list();setDogs(rows);if(dogId)setWeightHistory(await dogService.weights(dogId))}finally{setRefreshing(false)}};
-  useEffect(() => { if (!dogId) return; void Promise.all([feedingService.find(dogId),dogService.weights(dogId)]).then(([saved,history]) => { setWeightHistory(history); if (!saved) { setAdjustment(0); return; } setFoodName(saved.foodName); setKcal(String(saved.kcalPerKg)); setStage(saved.lifeStage); setGoal(saved.goal); setMeals(String(saved.mealsPerDay)); setTimes(saved.times.join(", ")); setAdjustment(saved.adjustmentPercent); }); }, [dogId]);
+  useEffect(() => { if (!dogId) return; void Promise.all([feedingService.find(dogId),dogService.weights(dogId)]).then(([saved,history]) => { setWeightHistory(history); if (!saved) { setAdjustment(0); return; } setFoodName(saved.foodName); setKcal(String(saved.kcalPerKg)); setStage(saved.lifeStage); setGoal(saved.goal); setMeals(String(saved.mealsPerDay)); setTimes(saved.times); setAdjustment(saved.adjustmentPercent); }); }, [dogId]);
   const plan = useMemo(() => {
     try {
       return dog
@@ -74,10 +79,7 @@ export default function Feeding() {
         throw new Error(
           "Selecione o cão e preencha ração, kcal/kg e refeições.",
         );
-      const parsedTimes = times
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean);
+      const parsedTimes = times.slice(0, plan.mealsPerDay);
       if (parsedTimes.length !== plan.mealsPerDay)
         throw new Error(
           `Informe exatamente ${plan.mealsPerDay} horários separados por vírgula.`,
@@ -102,15 +104,9 @@ export default function Feeding() {
         goal,
         adjustmentPercent: adjustment,
       });
-      Alert.alert(
-        "Plano salvo",
-        `${plan.gramsPerMeal} g, ${plan.mealsPerDay} vezes ao dia. Lembretes programados.`,
-      );
+      setDialog({title:"Plano salvo",message:`${plan.gramsPerMeal} g, ${plan.mealsPerDay} vezes ao dia. Lembretes programados.`});
     } catch (error) {
-      Alert.alert(
-        "Não foi possível salvar",
-        error instanceof Error ? error.message : "Confira os dados.",
-      );
+      setDialog({title:"Não foi possível salvar",message:error instanceof Error ? error.message : "Confira os dados."});
     }
   }
   return (
@@ -121,28 +117,7 @@ export default function Feeding() {
         Estimativa inicial baseada no peso e na energia da ração.
       </Text>
       <Text style={common.label}>SELECIONE O CÃO</Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={{ marginBottom: 14 }}
-      >
-        {dogs.map((item) => (
-          <Pressable
-            key={item.id}
-            onPress={() => setDogId(item.id)}
-            style={[
-              common.card,
-              { marginRight: 10, minWidth: 130 },
-              dogId === item.id && common.selected,
-            ]}
-          >
-            <Text style={{ color: colors.text, fontWeight: "800" }}>
-              {item.name}
-            </Text>
-            <Text style={common.muted}>{item.weightKg} kg</Text>
-          </Pressable>
-        ))}
-      </ScrollView>
+      <DogPicker dogs={dogs} value={dogId||null} onChange={(id)=>setDogId(id??'')}/>
       <View style={common.card}>
         <Text style={common.label}>RAÇÃO</Text>
         <TextInput
@@ -176,8 +151,8 @@ export default function Feeding() {
               );
             }}
             style={[
-              common.card,
-              { padding: 12 },
+              common.actionButton,
+              { padding: 12, marginBottom:8 },
               stage === value && common.selected,
             ]}
           >
@@ -197,7 +172,7 @@ export default function Feeding() {
               key={value}
               onPress={() => setGoal(value)}
               style={[
-                common.card,
+                common.actionButton,
                 { flex: 1, padding: 10 },
                 goal === value && common.selected,
               ]}
@@ -209,14 +184,10 @@ export default function Feeding() {
           ))}
         </View>
         <Text style={common.label}>REFEIÇÕES POR DIA</Text>
-        <TextInput
-          style={common.input}
-          value={meals}
-          onChangeText={setMeals}
-          keyboardType="number-pad"
-        />
-        <Text style={common.label}>HORÁRIOS, SEPARADOS POR VÍRGULA</Text>
-        <TextInput style={common.input} value={times} onChangeText={setTimes} />
+        <View style={[common.row,{marginBottom:14}]}>{[2,3,4,5,6].map(n=><Pressable key={n} style={[common.actionButton,{flex:1},Number(meals)===n&&common.selected]} onPress={()=>{setMeals(String(n));setTimes(current=>Array.from({length:n},(_,i)=>current[i]??`${String(7+i*3).padStart(2,'0')}:00`))}}><Text style={{color:colors.text,fontWeight:'800'}}>{n}×</Text></Pressable>)}</View>
+        <Text style={common.label}>HORÁRIOS</Text>
+        <View style={[common.row,{marginBottom:8}]}>{times.slice(0,Number(meals)).map((time,index)=><Pressable key={index} style={[common.actionButton,{width:'47%',justifyContent:'center'}]} onPress={()=>setTimePicker(index)}><Ionicons name="time-outline" size={18} color={colors.blue}/><Text style={{color:colors.text,fontWeight:'800'}}>{time}</Text></Pressable>)}</View>
+        {timePicker!==null&&<DateTimePicker value={new Date(`2000-01-01T${times[timePicker]??'07:00'}:00`)} mode="time" is24Hour display={Platform.OS==='ios'?'spinner':'default'} onChange={(_,value)=>{if(Platform.OS!=='ios')setTimePicker(null);if(value)setTimes(current=>current.map((item,i)=>i===timePicker?`${String(value.getHours()).padStart(2,'0')}:${String(value.getMinutes()).padStart(2,'0')}`:item))}}/>}
       </View>
       {plan && (
         <View style={[common.card, { borderColor: colors.blue }]}>
@@ -255,6 +226,6 @@ export default function Feeding() {
       >
         <Ionicons name="save-outline" size={19} color="white" /><Text style={common.buttonText}>Salvar e criar lembretes</Text>
       </Pressable>
-    </ScrollView></SafeAreaView>
+    </ScrollView><ThemedDialog visible={!!dialog} title={dialog?.title??''} message={dialog?.message??''} onClose={()=>setDialog(null)}/></SafeAreaView>
   );
 }

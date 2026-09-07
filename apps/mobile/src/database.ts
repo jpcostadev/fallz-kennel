@@ -54,8 +54,10 @@ export interface WeightRecord {
   version: number;
   deviceId: string;
 }
+export type MobileModule = 'health'|'breeding'|'clients'|'finance'
+export interface MobileModuleRecord { id:string;module:MobileModule;title:string;category:string;date:string;description:string;amount:number|null;dogId:string|null;phone:string;whatsapp:string;email:string;transactionType:'income'|'expense'|null;quantity:number|null;unit:string;createdAt:string;updatedAt:string;deletedAt:string|null;version:number;deviceId:string }
 export type CloudEntity =
-  "dogs" | "dog_measurements" | "agenda" | "feeding_plans";
+  "dogs" | "dog_measurements" | "agenda" | "feeding_plans" | "module_records";
 export interface CloudEvent {
   id: string;
   entityType: CloudEntity;
@@ -77,6 +79,7 @@ CREATE TABLE IF NOT EXISTS dogs(id TEXT PRIMARY KEY,name TEXT NOT NULL,birth_dat
 CREATE TABLE IF NOT EXISTS feeding_plans(id TEXT PRIMARY KEY,dog_id TEXT NOT NULL REFERENCES dogs(id),food_name TEXT NOT NULL,kcal_per_kg REAL NOT NULL,daily_grams REAL NOT NULL,grams_per_meal REAL NOT NULL,meals_per_day INTEGER NOT NULL,times_json TEXT NOT NULL,life_stage TEXT NOT NULL DEFAULT 'adult-intact',goal TEXT NOT NULL DEFAULT 'maintain',adjustment_percent REAL NOT NULL DEFAULT 0,created_at TEXT NOT NULL DEFAULT '',updated_at TEXT NOT NULL,deleted_at TEXT,version INTEGER NOT NULL DEFAULT 1,device_id TEXT NOT NULL DEFAULT '');
 CREATE TABLE IF NOT EXISTS reminders(id TEXT PRIMARY KEY,dog_id TEXT REFERENCES dogs(id),title TEXT NOT NULL,date_time TEXT NOT NULL,type TEXT NOT NULL,notification_id TEXT,created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS weight_records(id TEXT PRIMARY KEY,dog_id TEXT NOT NULL REFERENCES dogs(id),date TEXT NOT NULL,weight_grams INTEGER NOT NULL,age_days INTEGER NOT NULL DEFAULT 0,height REAL,chest_circumference REAL,head_circumference REAL,body_condition_score INTEGER,notes TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL,updated_at TEXT NOT NULL,deleted_at TEXT,version INTEGER NOT NULL DEFAULT 1,device_id TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS module_records(id TEXT PRIMARY KEY,module TEXT NOT NULL,title TEXT NOT NULL,category TEXT NOT NULL,date TEXT NOT NULL,description TEXT NOT NULL DEFAULT '',amount REAL,dog_id TEXT,phone TEXT NOT NULL DEFAULT '',whatsapp TEXT NOT NULL DEFAULT '',email TEXT NOT NULL DEFAULT '',transaction_type TEXT,quantity REAL,unit TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL,updated_at TEXT NOT NULL,deleted_at TEXT,version INTEGER NOT NULL DEFAULT 1,device_id TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS sync_queue(id TEXT PRIMARY KEY,entity_type TEXT NOT NULL,entity_id TEXT NOT NULL,operation TEXT NOT NULL,payload TEXT NOT NULL,created_at TEXT NOT NULL,synced_at TEXT,error TEXT);
 CREATE TABLE IF NOT EXISTS sync_applied_events(event_id TEXT PRIMARY KEY,applied_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_mobile_weight_dog_date ON weight_records(dog_id,date); CREATE INDEX IF NOT EXISTS idx_mobile_reminders_date ON reminders(date_time); CREATE INDEX IF NOT EXISTS idx_mobile_sync_pending ON sync_queue(synced_at,created_at);`);
@@ -112,14 +115,11 @@ async function queue(
     new Date().toISOString(),
   );
 }
-const days = (birth: string, date: string) =>
-  Math.max(
-    0,
-    Math.floor(
-      (Date.parse(`${date}T12:00:00Z`) - Date.parse(`${birth}T12:00:00Z`)) /
-        86400000,
-    ),
-  );
+const days = (birth: string, date: string) => {
+  const start=Date.parse(`${birth}T12:00:00Z`), end=Date.parse(`${date}T12:00:00Z`)
+  if(Number.isNaN(start)||Number.isNaN(end)) throw new Error('Selecione uma data válida.')
+  return Math.max(0,Math.floor((end-start)/86400000))
+};
 
 export const dogService = {
   async update(
@@ -398,10 +398,10 @@ export const dogService = {
         dog.weightKg,
         dog.breed.trim(),
         dog.sex,
-        "",
-        "",
-        "puppy",
-        "",
+        dog.registeredName,
+        dog.color,
+        dog.status,
+        dog.notes,
         now,
         now,
         1,
@@ -695,6 +695,12 @@ export const reminderService = {
   },
 };
 
+export const moduleService = {
+  async list(module:MobileModule):Promise<MobileModuleRecord[]>{const rows=await (await getDatabase()).getAllAsync<any>('SELECT * FROM module_records WHERE module=? AND deleted_at IS NULL ORDER BY date DESC,updated_at DESC',module);return rows.map((r:any)=>({id:r.id,module:r.module,title:r.title,category:r.category,date:r.date,description:r.description,amount:r.amount,dogId:r.dog_id,phone:r.phone,whatsapp:r.whatsapp,email:r.email,transactionType:r.transaction_type,quantity:r.quantity,unit:r.unit,createdAt:r.created_at,updatedAt:r.updated_at,deletedAt:r.deleted_at,version:r.version,deviceId:r.device_id}))},
+  async save(input:Omit<MobileModuleRecord,'id'|'createdAt'|'updatedAt'|'deletedAt'|'version'|'deviceId'>,id?:string){const db=await getDatabase(),now=new Date().toISOString(),deviceId=await getDeviceId();const previous=id?await db.getFirstAsync<{created_at:string;version:number}>('SELECT created_at,version FROM module_records WHERE id=?',id):null;const record:MobileModuleRecord={...input,id:id??uuid(),createdAt:previous?.created_at??now,updatedAt:now,deletedAt:null,version:(previous?.version??0)+1,deviceId};await db.withTransactionAsync(async()=>{await db.runAsync(`INSERT INTO module_records(id,module,title,category,date,description,amount,dog_id,phone,whatsapp,email,transaction_type,quantity,unit,created_at,updated_at,deleted_at,version,device_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET module=excluded.module,title=excluded.title,category=excluded.category,date=excluded.date,description=excluded.description,amount=excluded.amount,dog_id=excluded.dog_id,phone=excluded.phone,whatsapp=excluded.whatsapp,email=excluded.email,transaction_type=excluded.transaction_type,quantity=excluded.quantity,unit=excluded.unit,updated_at=excluded.updated_at,deleted_at=NULL,version=excluded.version,device_id=excluded.device_id`,record.id,record.module,record.title,record.category,record.date,record.description,record.amount,record.dogId,record.phone,record.whatsapp,record.email,record.transactionType,record.quantity,record.unit,record.createdAt,record.updatedAt,null,record.version,record.deviceId);await queue(db,'module_records',record.id,previous?'update':'create',{...record})});return record},
+  async remove(id:string){const db=await getDatabase(),row=await db.getFirstAsync<any>('SELECT * FROM module_records WHERE id=? AND deleted_at IS NULL',id);if(!row)return;const now=new Date().toISOString(),record={id:row.id,module:row.module,title:row.title,category:row.category,date:row.date,description:row.description,amount:row.amount,dogId:row.dog_id,phone:row.phone,whatsapp:row.whatsapp,email:row.email,transactionType:row.transaction_type,quantity:row.quantity,unit:row.unit,createdAt:row.created_at,updatedAt:now,deletedAt:now,version:row.version+1,deviceId:row.device_id};await db.withTransactionAsync(async()=>{await db.runAsync('UPDATE module_records SET deleted_at=?,updated_at=?,version=? WHERE id=?',now,now,record.version,id);await queue(db,'module_records',id,'delete',record)})}
+}
+
 export const syncService = {
   async summary() {
     const db = await getDatabase();
@@ -833,6 +839,11 @@ export const syncService = {
             p.deletedAt == null ? null : String(p.deletedAt),
             Number(p.version),
             String(p.deviceId),
+          );
+        } else if (event.entityType === "module_records") {
+          await db.runAsync(
+            `INSERT INTO module_records(id,module,title,category,date,description,amount,dog_id,phone,whatsapp,email,transaction_type,quantity,unit,created_at,updated_at,deleted_at,version,device_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET module=excluded.module,title=excluded.title,category=excluded.category,date=excluded.date,description=excluded.description,amount=excluded.amount,dog_id=excluded.dog_id,phone=excluded.phone,whatsapp=excluded.whatsapp,email=excluded.email,transaction_type=excluded.transaction_type,quantity=excluded.quantity,unit=excluded.unit,updated_at=excluded.updated_at,deleted_at=excluded.deleted_at,version=excluded.version,device_id=excluded.device_id WHERE excluded.version>module_records.version OR (excluded.version=module_records.version AND excluded.updated_at>module_records.updated_at)`,
+            String(p.id),String(p.module),String(p.title),String(p.category),String(p.date),String(p.description??''),p.amount==null?null:Number(p.amount),p.dogId==null?null:String(p.dogId),String(p.phone??''),String(p.whatsapp??''),String(p.email??''),p.transactionType==null?null:String(p.transactionType),p.quantity==null?null:Number(p.quantity),String(p.unit??''),String(p.createdAt),String(p.updatedAt),p.deletedAt==null?null:String(p.deletedAt),Number(p.version),String(p.deviceId)
           );
         }
         await db.runAsync(

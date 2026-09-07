@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import {
   Alert,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -8,6 +9,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -28,6 +30,7 @@ export default function Agenda() {
   const [dateTime, setDateTime] = useState("");
   const [editing, setEditing] = useState<Reminder | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [showDate,setShowDate]=useState(false),[showTime,setShowTime]=useState(false);
   const load = useCallback(() => {
     void Promise.all([dogService.list(), reminderService.list()]).then(
       ([d, r]) => {
@@ -94,14 +97,10 @@ export default function Agenda() {
         </ScrollView>
         <Text style={common.label}>TÍTULO</Text>
         <TextInput style={common.input} value={title} onChangeText={setTitle} />
-        <Text style={common.label}>DATA E HORA (AAAA-MM-DDTHH:MM)</Text>
-        <TextInput
-          style={common.input}
-          value={dateTime}
-          onChangeText={setDateTime}
-          placeholder="2026-09-10T14:00"
-          placeholderTextColor={colors.muted}
-        />
+        <Text style={common.label}>DATA E HORA</Text>
+        <View style={[common.row,{flexWrap:'nowrap',marginBottom:14}]}><Pressable style={[common.actionButton,{flex:1}]} onPress={()=>setShowDate(true)}><Ionicons name="calendar-outline" size={18} color={colors.blue}/><Text style={{color:dateTime?colors.text:colors.muted,fontWeight:'800'}}>{dateTime?new Date(dateTime).toLocaleDateString('pt-BR'):'Selecionar data'}</Text></Pressable><Pressable style={[common.actionButton,{flex:1}]} onPress={()=>setShowTime(true)}><Ionicons name="time-outline" size={18} color={colors.blue}/><Text style={{color:dateTime?colors.text:colors.muted,fontWeight:'800'}}>{dateTime?new Date(dateTime).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'Selecionar hora'}</Text></Pressable></View>
+        {showDate&&<DateTimePicker value={dateTime?new Date(dateTime):new Date()} minimumDate={new Date()} mode="date" display={Platform.OS==='ios'?'spinner':'default'} onChange={(_,date)=>{setShowDate(Platform.OS==='ios');if(date){const current=dateTime?new Date(dateTime):new Date();date.setHours(current.getHours(),current.getMinutes(),0,0);setDateTime(date.toISOString())}}}/>}
+        {showTime&&<DateTimePicker value={dateTime?new Date(dateTime):new Date()} mode="time" is24Hour display={Platform.OS==='ios'?'spinner':'default'} onChange={(_,time)=>{setShowTime(Platform.OS==='ios');if(time){const current=dateTime?new Date(dateTime):new Date();current.setHours(time.getHours(),time.getMinutes(),0,0);setDateTime(current.toISOString())}}}/>}
         <Pressable style={common.button} onPress={() => void save()}><Ionicons name="notifications-outline" size={19} color="white" />
           <Text style={common.buttonText}>{editing ? "Salvar alterações" : "Agendar notificação"}</Text>
         </Pressable>
