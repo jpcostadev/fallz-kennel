@@ -47,7 +47,12 @@ const api: FallzApi = {
   },
   updater: {
     check: () => ipcRenderer.invoke('updater:check'),
-    install: () => ipcRenderer.invoke('updater:install')
+    install: () => ipcRenderer.invoke('updater:install'),
+    onStatus: (callback) => {
+      const listener = (_event: Electron.IpcRendererEvent, status: Parameters<typeof callback>[0]): void => callback(status)
+      ipcRenderer.on('updater:status', listener)
+      return () => ipcRenderer.removeListener('updater:status', listener)
+    }
   }
 }
 

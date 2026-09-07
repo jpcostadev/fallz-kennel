@@ -50,7 +50,15 @@ export interface FallzApi extends ModuleApi, MeasurementApi, SyncApi, FeedingApi
   }
   dashboard: { summary(): Promise<DashboardSummary> }
   updater: {
-    check(): Promise<{ status: string; message: string; version?: string }>
+    check(): Promise<UpdateStatus>
     install(): Promise<void>
+    onStatus(callback: (status: UpdateStatus) => void): () => void
   }
+}
+
+export interface UpdateStatus {
+  status: 'idle' | 'checking' | 'current' | 'downloading' | 'downloaded' | 'installing' | 'development' | 'error'
+  message: string
+  version?: string
+  percent?: number
 }

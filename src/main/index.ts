@@ -10,24 +10,38 @@ import { syncEventSchema } from '../shared/sync'
 import { z } from 'zod'
 import { feedingPlanInputSchema } from '../shared/feeding'
 import electronUpdater from 'electron-updater'
+import type { UpdateStatus } from '../shared/dog'
 
 const { autoUpdater } = electronUpdater
 autoUpdater.autoDownload = true
 autoUpdater.autoInstallOnAppQuit = true
+let updateState: UpdateStatus = { status: 'idle', message: '' }
+function publishUpdate(status: UpdateStatus): void {
+  updateState = status
+  for (const window of BrowserWindow.getAllWindows()) window.webContents.send('updater:status', status)
+}
+autoUpdater.on('checking-for-update', () => publishUpdate({ status: 'checking', message: 'Verificando atualização...' }))
+autoUpdater.on('update-available', (info) => publishUpdate({ status: 'downloading', version: info.version, percent: 0, message: `Baixando versão ${info.version}...` }))
+autoUpdater.on('download-progress', (progress) => publishUpdate({ status: 'downloading', percent: Math.round(progress.percent), message: `Baixando atualização... ${Math.round(progress.percent)}%` }))
+autoUpdater.on('update-downloaded', (info) => publishUpdate({ status: 'downloaded', version: info.version, percent: 100, message: `Versão ${info.version} pronta para instalar.` }))
+autoUpdater.on('update-not-available', () => publishUpdate({ status: 'current', message: `Você já está na versão mais recente (${app.getVersion()}).` }))
+autoUpdater.on('error', (error) => publishUpdate({ status: 'error', message: error.message || 'Não foi possível atualizar.' }))
 
 function registerIpc(): void {
   ipcMain.handle('updater:check', async () => {
     if (!app.isPackaged) return { status:'development', message:'Atualizações são verificadas no aplicativo instalado.' }
     try {
-      const result = await autoUpdater.checkForUpdates()
-      const version = result?.updateInfo.version
-      if (!version || version === app.getVersion()) return { status:'current', message:`Você já está na versão mais recente (${app.getVersion()}).` }
-      return { status:'downloading', version, message:`Versão ${version} encontrada. O download começou automaticamente.` }
+      await autoUpdater.checkForUpdates()
+      return updateState
     } catch (error) {
       return { status:'error', message:error instanceof Error ? error.message : 'Não foi possível consultar atualizações.' }
     }
   })
-  ipcMain.handle('updater:install', () => autoUpdater.quitAndInstall(false, true))
+  ipcMain.handle('updater:install', () => {
+    if (updateState.status !== 'downloaded') return
+    publishUpdate({ ...updateState, status: 'installing', message: 'Instalando atualização e reiniciando...' })
+    setTimeout(() => autoUpdater.quitAndInstall(false, true), 250)
+  })
   ipcMain.handle('dogs:list', () => dogRepository.findAll())
   ipcMain.handle('dogs:create', (_event, rawInput: unknown) => dogRepository.create(createDogSchema.parse(rawInput)))
   ipcMain.handle('dogs:update', (_event, id:unknown,rawInput:unknown) => dogRepository.update(recordIdSchema.parse(id),createDogSchema.parse(rawInput)))

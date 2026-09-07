@@ -52,6 +52,7 @@ import {
   type CreateDogInput,
   type DashboardSummary,
   type Dog,
+  type UpdateStatus,
 } from "../../shared/dog";
 import {
   kennelSettingsSchema,
@@ -2248,8 +2249,7 @@ function SyncPage({
 function SettingsPage(): React.JSX.Element {
   const [loaded, setLoaded] = useState(false);
   const [message, setMessage] = useState("");
-  const [updateMessage, setUpdateMessage] = useState("");
-  const [updateReady, setUpdateReady] = useState(false);
+  const [updateState, setUpdateState] = useState<UpdateStatus>({ status: "idle", message: "" });
   const {
     register,
     reset,
@@ -2273,16 +2273,17 @@ function SettingsPage(): React.JSX.Element {
       setLoaded(true);
     });
   }, [reset]);
+  useEffect(() => window.fallz.updater.onStatus(setUpdateState), []);
   async function submit(input: KennelSettings): Promise<void> {
     await window.fallz.settings.save(input);
     setMessage("Configurações salvas no banco local.");
   }
   async function checkUpdate(): Promise<void> {
-    setUpdateMessage("Verificando...");
+    setUpdateState({ status: "checking", message: "Verificando atualização..." });
     const result = await window.fallz.updater.check();
-    setUpdateMessage(result.message);
-    setUpdateReady(result.status === "downloading");
+    setUpdateState(result);
   }
+  const updateBusy = updateState.status === "checking" || updateState.status === "downloading" || updateState.status === "installing";
   return (
     <>
       <section className="welcome module-welcome">
@@ -2303,22 +2304,30 @@ function SettingsPage(): React.JSX.Element {
           </div>
         </div>
         <div className="modal-actions">
-          {updateMessage && (
-            <span className="success-message">{updateMessage}</span>
+          {updateState.message && (
+            <span className={`update-message ${updateState.status === "error" ? "error" : ""}`}>{updateState.message}</span>
           )}
-          {updateReady ? (
+          {updateState.status === "downloaded" ? (
             <button
               className="primary-button"
-              onClick={() => void window.fallz.updater.install()}
+              onClick={() => {
+                setUpdateState((value) => ({ ...value, status: "installing", message: "Instalando atualização e reiniciando..." }));
+                void window.fallz.updater.install();
+              }}
             >
               <Download /> Instalar e reiniciar
             </button>
           ) : (
             <button
-              className="primary-button"
+              className={`primary-button ${updateBusy ? "update-working" : ""}`}
+              disabled={updateBusy}
               onClick={() => void checkUpdate()}
             >
-              <RefreshCw /> Verificar atualização
+              {updateState.status === "downloading" ? <Download /> : <RefreshCw />}
+              {updateState.status === "checking" && "Verificando..."}
+              {updateState.status === "downloading" && `Baixando... ${updateState.percent ?? 0}%`}
+              {updateState.status === "installing" && "Instalando..."}
+              {!updateBusy && "Verificar atualização"}
             </button>
           )}
         </div>
