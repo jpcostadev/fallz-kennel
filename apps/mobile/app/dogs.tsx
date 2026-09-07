@@ -23,6 +23,7 @@ import {
 import { colors, common } from "../src/theme";
 import { ThemedDialog } from "../src/ThemedDialog";
 import { selectOptimizedDogPhoto } from "../src/dog-photo";
+import { shareDogReport } from "../src/share-dog-report";
 
 type Mode = "profile" | "form" | "tracking" | null;
 const age = (date: string) => {
@@ -517,6 +518,25 @@ export default function Dogs() {
                       </Text>
                     </Pressable>
                   </View>
+                  <Pressable
+                    style={[common.actionButton, { marginTop: 10 }]}
+                    onPress={() =>
+                      void shareDogReport(selected).catch((error) =>
+                        setDialog({
+                          title: "Não foi possível compartilhar",
+                          message:
+                            error instanceof Error
+                              ? error.message
+                              : "Tente novamente.",
+                        }),
+                      )
+                    }
+                  >
+                    <Ionicons name="share-social-outline" size={19} color={colors.blue} />
+                    <Text style={{ color: colors.text, fontWeight: "900" }}>
+                      Compartilhar ficha em PDF
+                    </Text>
+                  </Pressable>
                   <Pressable
                     style={[
                       common.actionButton,

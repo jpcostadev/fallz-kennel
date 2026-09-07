@@ -1,4 +1,5 @@
 import * as Updates from "expo-updates";
+import { BackHandler, Platform } from "react-native";
 
 export type UpdateStage =
   "idle" | "checking" | "downloading" | "ready" | "restarting";
@@ -7,7 +8,7 @@ export const updateStageLabel: Record<UpdateStage, string> = {
   checking: "Verificando...",
   downloading: "Baixando atualização...",
   ready: "Atualização pronta",
-  restarting: "Reiniciando...",
+  restarting: "Fechando para aplicar...",
 };
 
 type ShowDialog = (dialog: {
@@ -43,21 +44,16 @@ export async function checkAndInstallUpdate(
     setStage("ready");
     showDialog({
       title: "Atualização pronta",
-      message: "O download terminou. Reiniciar agora para aplicar?",
-      confirmLabel: "Reiniciar",
+      message:
+        Platform.OS === "android"
+          ? "O download terminou. O aplicativo será fechado com segurança. Abra-o novamente para aplicar a atualização."
+          : "O download terminou. Feche e abra o aplicativo novamente para aplicar a atualização.",
+      confirmLabel: Platform.OS === "android" ? "Fechar aplicativo" : "Entendi",
       onConfirm: () => {
-        setStage("restarting");
-        setTimeout(
-          () =>
-            void Updates.reloadAsync({
-              reloadScreenOptions: {
-                backgroundColor: "#050a10",
-                fade: true,
-                spinner: { enabled: true, color: "#1686ff", size: "large" },
-              },
-            }),
-          200,
-        );
+        if (Platform.OS === "android") {
+          setStage("restarting");
+          setTimeout(() => BackHandler.exitApp(), 200);
+        } else setStage("idle");
       },
     });
   } catch (error) {
