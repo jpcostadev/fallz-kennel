@@ -788,7 +788,7 @@ export const syncService = {
           );
         } else if (event.entityType === "dog_measurements") {
           await db.runAsync(
-            `INSERT INTO weight_records(id,dog_id,date,weight_grams,age_days,height,chest_circumference,head_circumference,body_condition_score,notes,created_at,updated_at,deleted_at,version,device_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET weight_grams=excluded.weight_grams,body_condition_score=excluded.body_condition_score,updated_at=excluded.updated_at,version=excluded.version WHERE excluded.version>weight_records.version OR (excluded.version=weight_records.version AND excluded.updated_at>weight_records.updated_at)`,
+            `INSERT INTO weight_records(id,dog_id,date,weight_grams,age_days,height,chest_circumference,head_circumference,body_condition_score,notes,created_at,updated_at,deleted_at,version,device_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET dog_id=excluded.dog_id,date=excluded.date,weight_grams=excluded.weight_grams,age_days=excluded.age_days,height=excluded.height,chest_circumference=excluded.chest_circumference,head_circumference=excluded.head_circumference,body_condition_score=excluded.body_condition_score,notes=excluded.notes,updated_at=excluded.updated_at,deleted_at=excluded.deleted_at,version=excluded.version,device_id=excluded.device_id WHERE excluded.version>weight_records.version OR (excluded.version=weight_records.version AND excluded.updated_at>weight_records.updated_at)`,
             String(p.id),
             String(p.dogId),
             String(p.date),
@@ -805,16 +805,18 @@ export const syncService = {
             Number(p.version),
             String(p.deviceId),
           );
-          await db.runAsync(
-            "UPDATE dogs SET weight_kg=?,updated_at=? WHERE id=? AND updated_at<=?",
-            Number(p.weightGrams) / 1000,
-            String(p.updatedAt),
+          const latestWeight = await db.getFirstAsync<{ weight_grams: number }>(
+            "SELECT weight_grams FROM weight_records WHERE dog_id=? AND deleted_at IS NULL ORDER BY date DESC,updated_at DESC LIMIT 1",
             String(p.dogId),
-            String(p.updatedAt),
+          );
+          if (latestWeight) await db.runAsync(
+            "UPDATE dogs SET weight_kg=? WHERE id=?",
+            latestWeight.weight_grams / 1000,
+            String(p.dogId),
           );
         } else if (event.entityType === "feeding_plans") {
           await db.runAsync(
-            `INSERT INTO feeding_plans(id,dog_id,food_name,kcal_per_kg,daily_grams,grams_per_meal,meals_per_day,times_json,life_stage,goal,adjustment_percent,created_at,updated_at,deleted_at,version,device_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET food_name=excluded.food_name,kcal_per_kg=excluded.kcal_per_kg,daily_grams=excluded.daily_grams,grams_per_meal=excluded.grams_per_meal,meals_per_day=excluded.meals_per_day,times_json=excluded.times_json,life_stage=excluded.life_stage,goal=excluded.goal,adjustment_percent=excluded.adjustment_percent,updated_at=excluded.updated_at,version=excluded.version WHERE excluded.version>feeding_plans.version OR (excluded.version=feeding_plans.version AND excluded.updated_at>feeding_plans.updated_at)`,
+            `INSERT INTO feeding_plans(id,dog_id,food_name,kcal_per_kg,daily_grams,grams_per_meal,meals_per_day,times_json,life_stage,goal,adjustment_percent,created_at,updated_at,deleted_at,version,device_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET dog_id=excluded.dog_id,food_name=excluded.food_name,kcal_per_kg=excluded.kcal_per_kg,daily_grams=excluded.daily_grams,grams_per_meal=excluded.grams_per_meal,meals_per_day=excluded.meals_per_day,times_json=excluded.times_json,life_stage=excluded.life_stage,goal=excluded.goal,adjustment_percent=excluded.adjustment_percent,updated_at=excluded.updated_at,deleted_at=excluded.deleted_at,version=excluded.version,device_id=excluded.device_id WHERE excluded.version>feeding_plans.version OR (excluded.version=feeding_plans.version AND excluded.updated_at>feeding_plans.updated_at)`,
             String(p.id),
             String(p.dogId),
             String(p.foodName),
