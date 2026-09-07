@@ -3,6 +3,8 @@ out/
 dist/
 release/
 release-mobile/
+release-archive-*/
+release-failed-*/
 *.jks
 *-firebase-adminsdk-*.json
 firebase-service-account*.json
