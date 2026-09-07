@@ -4,6 +4,8 @@ dist/
 release/
 release-mobile/
 *.jks
+*-firebase-adminsdk-*.json
+firebase-service-account*.json
 *.log
 .env
 .DS_Store

@@ -16,6 +16,7 @@
     },
     "android": {
       "package": "com.fallzkennel.mobile",
+      "googleServicesFile": "../../google-services.json",
       "versionCode": 4,
       "permissions": [
         "SCHEDULE_EXACT_ALARM",

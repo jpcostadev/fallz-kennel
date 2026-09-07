@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "516615052850",
+    "project_id": "fallzkannel",
+    "storage_bucket": "fallzkannel.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:516615052850:android:07b9b2e983f91a8589262b",
+        "android_client_info": {
+          "package_name": "com.fallzkennel.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCdslT_N2OdbnobCGDwqBhWvMuqWnRsC6g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
