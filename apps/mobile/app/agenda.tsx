@@ -24,6 +24,7 @@ import {
 } from "../src/notifications";
 import { colors, common } from "../src/theme";
 import { ThemedDialog } from "../src/ThemedDialog";
+import { DogPicker } from "../src/DogPicker";
 
 export default function Agenda() {
   const [dogs, setDogs] = useState<MobileDog[]>([]);
@@ -116,21 +117,12 @@ export default function Agenda() {
         </Text>
         <View style={common.card}>
           <Text style={common.label}>CÃO (OPCIONAL)</Text>
-          <ScrollView horizontal>
-            {dogs.map((d) => (
-              <Pressable
-                key={d.id}
-                onPress={() => setDogId(d.id)}
-                style={[
-                  common.card,
-                  { marginRight: 8, padding: 10 },
-                  dogId === d.id && common.selected,
-                ]}
-              >
-                <Text style={{ color: colors.text }}>{d.name}</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
+          <DogPicker
+            dogs={dogs}
+            value={dogId}
+            onChange={setDogId}
+            optional
+          />
           <Text style={common.label}>TÍTULO</Text>
           <TextInput
             style={common.input}
