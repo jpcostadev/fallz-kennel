@@ -1,6 +1,5 @@
 import { useCallback, useState } from "react";
 import {
-  Alert,
   Image,
   Modal,
   Platform,
@@ -524,18 +523,17 @@ export default function Dogs() {
                       { marginTop: 10, borderColor: "#67303b" },
                     ]}
                     onPress={() =>
-                      Alert.alert("Excluir cão", `Excluir ${selected.name}?`, [
-                        { text: "Cancelar" },
-                        {
-                          text: "Excluir",
-                          style: "destructive",
-                          onPress: () =>
-                            void dogService.remove(selected.id).then(() => {
-                              close();
-                              load();
-                            }),
-                        },
-                      ])
+                      setDialog({
+                        title: "Excluir cão?",
+                        message: `Excluir ${selected.name}? A exclusão será sincronizada em todos os dispositivos.`,
+                        danger: true,
+                        action: () =>
+                          void dogService.remove(selected.id).then(() => {
+                            setDialog(null);
+                            close();
+                            load();
+                          }),
+                      })
                     }
                   >
                     <Ionicons
@@ -753,21 +751,19 @@ export default function Dogs() {
                           <Pressable
                             style={common.actionButton}
                             onPress={() =>
-                              Alert.alert(
-                                "Excluir pesagem",
-                                "Confirmar exclusão?",
-                                [
-                                  { text: "Cancelar" },
-                                  {
-                                    text: "Excluir",
-                                    style: "destructive",
-                                    onPress: () =>
-                                      void dogService
-                                        .removeWeight(w.id)
-                                        .then(() => openTracking(selected)),
-                                  },
-                                ],
-                              )
+                              setDialog({
+                                title: "Excluir pesagem?",
+                                message:
+                                  "Confirma a exclusão desta pesagem do acompanhamento?",
+                                danger: true,
+                                action: () =>
+                                  void dogService
+                                    .removeWeight(w.id)
+                                    .then(() => {
+                                      setDialog(null);
+                                      return openTracking(selected);
+                                    }),
+                              })
                             }
                           >
                             <Ionicons

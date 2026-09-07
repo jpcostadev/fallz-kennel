@@ -80,6 +80,7 @@ import {
   veterinaryTopics,
   type VetTopic,
 } from "../../../apps/mobile/src/veterinary-knowledge";
+import { useUiDialog } from "./ui-dialog";
 
 type Page =
   | "dashboard"
@@ -799,6 +800,7 @@ function DogsPage({
   onAdd(): void;
   onChanged(): Promise<void>;
 }): React.JSX.Element {
+  const dialog = useUiDialog();
   const [filter, setFilter] = useState<"all" | "male" | "female" | "puppy">(
     "all",
   );
@@ -887,7 +889,14 @@ function DogsPage({
                     aria-label={`Excluir ${dog.name}`}
                     title="Excluir cão"
                     onClick={async () => {
-                      if (confirm(`Excluir ${dog.name}?`)) {
+                      if (
+                        await dialog.confirm({
+                          title: "Excluir cão?",
+                          message: `Tem certeza que deseja excluir ${dog.name}? A exclusão será sincronizada em todos os dispositivos.`,
+                          confirmLabel: "Excluir cão",
+                          tone: "danger",
+                        })
+                      ) {
                         await window.fallz.dogs.remove(dog.id);
                         await onChanged();
                       }
@@ -1265,6 +1274,7 @@ function ModulePage({
   dogs: Dog[];
   quickCreate: number;
 }): React.JSX.Element {
+  const dialog = useUiDialog();
   const info = pageInfo[page];
   const [records, setRecords] = useState<ModuleRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1453,7 +1463,14 @@ function ModulePage({
                     className="row-action danger"
                     title="Excluir"
                     onClick={async () => {
-                      if (confirm(`Excluir “${record.title}”?`)) {
+                      if (
+                        await dialog.confirm({
+                          title: "Excluir registro?",
+                          message: `Tem certeza que deseja excluir “${record.title}”? A exclusão será sincronizada.`,
+                          confirmLabel: "Excluir registro",
+                          tone: "danger",
+                        })
+                      ) {
                         await window.fallz.records.remove(record.id);
                         await refresh();
                       }
@@ -2428,6 +2445,7 @@ function DogProfileDialog({
   dog: Dog;
   onClose(): void;
 }): React.JSX.Element {
+  const dialog = useUiDialog();
   const tabs = [
     "Resumo",
     "Acompanhamento",
@@ -2542,7 +2560,15 @@ function DogProfileDialog({
               onAdd={() => setEditingMeasurement(null)}
               onEdit={setEditingMeasurement}
               onRemove={async (id) => {
-                if (confirm("Excluir esta pesagem?")) {
+                if (
+                  await dialog.confirm({
+                    title: "Excluir pesagem?",
+                    message:
+                      "Tem certeza que deseja excluir esta pesagem do acompanhamento?",
+                    confirmLabel: "Excluir pesagem",
+                    tone: "danger",
+                  })
+                ) {
                   await window.fallz.measurements.remove(id);
                   await refreshMeasurements();
                 }
