@@ -166,7 +166,11 @@ export default function Settings() {
           setDialog(null);
           if (updateStage === "ready") setUpdateStage("idle");
         }}
-        onConfirm={dialog?.onConfirm}
+        onConfirm={dialog?.onConfirm ? () => {
+          const action = dialog.onConfirm!;
+          setDialog(null);
+          setTimeout(() => action(), 200);
+        } : undefined}
         confirmLabel={dialog?.confirmLabel}
       />
     </SafeAreaView>
