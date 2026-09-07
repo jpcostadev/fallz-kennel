@@ -76,6 +76,27 @@ export interface MobileModuleRecord {
   version: number;
   deviceId: string;
 }
+type MobileModuleRow = {
+  id: string;
+  module: MobileModule;
+  title: string;
+  category: string;
+  date: string;
+  description: string;
+  amount: number | null;
+  dog_id: string | null;
+  phone: string;
+  whatsapp: string;
+  email: string;
+  transaction_type: "income" | "expense" | null;
+  quantity: number | null;
+  unit: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+  version: number;
+  device_id: string;
+};
 export type CloudEntity =
   "dogs" | "dog_measurements" | "agenda" | "feeding_plans" | "module_records";
 export interface CloudEvent {
@@ -854,11 +875,11 @@ export const moduleService = {
   async list(module: MobileModule): Promise<MobileModuleRecord[]> {
     const rows = await (
       await getDatabase()
-    ).getAllAsync<any>(
+    ).getAllAsync<MobileModuleRow>(
       "SELECT * FROM module_records WHERE module=? AND deleted_at IS NULL ORDER BY date DESC,updated_at DESC",
       module,
     );
-    return rows.map((r: any) => ({
+    return rows.map((r) => ({
       id: r.id,
       module: r.module,
       title: r.title,
@@ -940,7 +961,7 @@ export const moduleService = {
   },
   async remove(id: string) {
     const db = await getDatabase(),
-      row = await db.getFirstAsync<any>(
+      row = await db.getFirstAsync<MobileModuleRow>(
         "SELECT * FROM module_records WHERE id=? AND deleted_at IS NULL",
         id,
       );
